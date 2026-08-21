@@ -1,37 +1,42 @@
 import { createServerClient } from "@supabase/ssr";
-import { createClient as createSbClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options?: Record<string, unknown> };
 
-export function createClient() {
-  const store = cookies();
-  return createServerClient(
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => store.getAll(),
+        getAll: () => request.cookies.getAll(),
         setAll: (list: CookieToSet[]) => {
-          try {
-            list.forEach(({ name, value, options }) => store.set(name, value, options as any));
-          } catch {
-            // called from a Server Component; middleware refreshes the session
-          }
+          list.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          list.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options as any)
+          );
         },
       },
     }
   );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const path = request.nextUrl.pathname;
+
+  if (!user && !path.startsWith("/login") && !path.startsWith("/auth")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  return response;
 }
 
-/**
- * Bypasses RLS. Only for webhook handlers and Inngest workers.
- * Never import this into a file that renders UI.
- */
-export function createServiceClient() {
-  return createSbClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
-}
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/inngest).*)"],
+};
