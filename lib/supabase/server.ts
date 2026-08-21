@@ -26,10 +26,6 @@ export function createClient() {
   );
 }
 
-/**
- * Bypasses RLS. Only for webhook handlers and Inngest workers.
- * Never import this into a file that renders UI.
- */
 export function createServiceClient() {
   return createSbClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
