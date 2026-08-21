@@ -14,7 +14,9 @@ export function createClient() {
         getAll: () => store.getAll(),
         setAll: (list: CookieToSet[]) => {
           try {
-            list.forEach(({ name, value, options }) => store.set(name, value, options as any));
+            list.forEach(({ name, value, options }) =>
+              store.set(name, value, options as any)
+            );
           } catch {
             // called from a Server Component; middleware refreshes the session
           }
