@@ -9,6 +9,7 @@ import { SourceUpload } from "@/components/SourceUpload";
 import { RefPanel } from "@/components/RefPanel";
 import { RefSheet } from "@/components/RefSheet";
 import { EpisodeCreate } from "@/components/EpisodeCreate";
+import { SeasonPlan } from "@/components/SeasonPlan";
 import { EPISODE_STEPS } from "@/lib/stages";
 
 export const dynamic = "force-dynamic";
@@ -174,7 +175,10 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
         <Locked what="Episodes" blockedBy="approving the cast" />
       ) : (
         <>
-          <EpisodeCreate seriesId={series.id} />
+          <SeasonPlan seriesId={series.id} hasEpisodes={(episodes ?? []).length > 0} />
+          <div style={{ marginTop: 12 }}>
+            <EpisodeCreate seriesId={series.id} />
+          </div>
           <div className="grid" style={{ marginTop: 12 }}>
             {(episodes ?? []).map((e: any) => (
               <Link
