@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/studio" className="brand">AI STUDIO</Link>
         <nav>
           <Link href="/dashboard">Dashboard</Link>
+          <Link href="/lab">Lab</Link>
           <Link href="/studio">Studio</Link>
         </nav>
         <div className="spacer" />
