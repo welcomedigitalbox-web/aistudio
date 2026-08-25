@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <nav>
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/projects">Projects</Link>
+          <Link href="/writer">Writer</Link>
         </nav>
         <div className="spacer" />
         <span className="mono note">{user.email}</span>
