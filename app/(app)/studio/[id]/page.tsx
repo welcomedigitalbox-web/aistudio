@@ -3,14 +3,30 @@ import { createClient } from "@/lib/supabase/server";
 import { StageRail } from "@/components/StageRail";
 import { Gate } from "@/components/Gate";
 import { Locked } from "@/components/Locked";
+import { Bootstrap } from "@/components/Bootstrap";
 import { BibleEditor } from "@/components/BibleEditor";
 import { SourceUpload } from "@/components/SourceUpload";
 import { RefPanel } from "@/components/RefPanel";
 import { RefSheet } from "@/components/RefSheet";
 import { EpisodeCreate } from "@/components/EpisodeCreate";
-import { SERIES_STEPS, seriesStepIndex, EPISODE_STEPS } from "@/lib/stages";
+import { EPISODE_STEPS } from "@/lib/stages";
 
 export const dynamic = "force-dynamic";
+
+/** Novel first, then everything derived from it. */
+const STEPS = [
+  { id: "add_source",    label: "Add the novel" },
+  { id: "reading",       label: "Reading" },
+  { id: "draft_bible",   label: "Draft the bible" },
+  { id: "approve_bible", label: "Approve the bible" },
+  { id: "draft_cast",    label: "Draft the cast" },
+  { id: "generate_refs", label: "Generate reference art" },
+  { id: "approve_refs",  label: "Approve the cast" },
+  { id: "add_episode",   label: "Add episode 1" },
+  { id: "ready",         label: "Ready" },
+] as const;
+
+const order = (id: string) => STEPS.findIndex((s) => s.id === id);
 
 export default async function ShowPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -35,12 +51,13 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
 
   if (!series) return <main><div className="empty">That show does not exist.</div></main>;
 
-  const step = stage?.next_step ?? "write_bible";
-  const at = seriesStepIndex(step);
-  const reached = (id: string) => at >= seriesStepIndex(id);
+  const step = stage?.next_step ?? "add_source";
+  const at = order(step);
+  const reached = (id: string) => at >= order(id);
 
   const characters = (refs ?? []).filter((r: any) => r.kind === "character");
   const sheets = (refs ?? []).filter((r: any) => r.kind !== "style");
+  const hasSource = (sources ?? []).some((s: any) => s.state === "ready");
 
   return (
     <main>
@@ -51,55 +68,78 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
       <p className="note" style={{ marginTop: 8, maxWidth: 620 }}>{series.premise}</p>
 
       <div style={{ marginTop: 20 }}>
-        <StageRail steps={SERIES_STEPS} currentId={step} />
+        <StageRail steps={STEPS} currentId={step} />
       </div>
 
-      {/* 1 — bible */}
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>1 · Bible</h2>
-      <BibleEditor seriesId={series.id} bible={series.bible ?? ""} locked={series.bible_approved} />
-      {series.bible && (
-        <div style={{ marginTop: 12 }}>
-          <Gate
-            seriesId={series.id}
-            gate="bible_approved"
-            approved={series.bible_approved}
-            what="The bible"
-            unlocks="uploading the novel"
-          />
-        </div>
+      {/* 1 — novel */}
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>1 · The novel</h2>
+      <SourceUpload seriesId={series.id} />
+      <div className="grid" style={{ marginTop: 12 }}>
+        {(sources ?? []).map((s: any) => (
+          <div key={s.id} className="card">
+            <div className="row between">
+              <div>
+                <h3>{s.title}</h3>
+                <div className="note">{s.author ? `${s.author} · ` : ""}{s.basis.replace("_", " ")}</div>
+              </div>
+              <span className="rail-label">{s.state}</span>
+            </div>
+            {s.error && <div className="err" style={{ marginTop: 8 }}>{s.error}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* 2 — read it */}
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>2 · Read it</h2>
+      {!hasSource ? (
+        <Locked what="Reading the novel" blockedBy="uploading a PDF" />
+      ) : (
+        <Bootstrap
+          seriesId={series.id}
+          hasBible={!!series.bible}
+          hasCast={characters.length > 0}
+          error={series.bootstrap_error}
+        />
       )}
 
-      {/* 2 — source */}
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>2 · The novel</h2>
-      {!reached("add_source") ? (
-        <Locked what="Source upload" blockedBy="approving the bible" />
+      {/* 3 — bible */}
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>3 · Bible</h2>
+      {!series.bible ? (
+        <Locked what="The bible" blockedBy="reading the novel" />
       ) : (
         <>
-          <SourceUpload seriesId={series.id} />
-          <div className="grid" style={{ marginTop: 12 }}>
-            {(sources ?? []).map((s: any) => (
-              <div key={s.id} className="card">
-                <div className="row between">
-                  <div>
-                    <h3>{s.title}</h3>
-                    <div className="note">{s.author ? `${s.author} · ` : ""}{s.basis.replace("_", " ")}</div>
-                  </div>
-                  <span className="rail-label">{s.state}</span>
-                </div>
-                {s.error && <div className="err" style={{ marginTop: 8 }}>{s.error}</div>}
-              </div>
-            ))}
+          <BibleEditor seriesId={series.id} bible={series.bible} locked={series.bible_approved} />
+          <div style={{ marginTop: 12 }}>
+            <Gate
+              seriesId={series.id}
+              gate="bible_approved"
+              approved={series.bible_approved}
+              what="The bible"
+              unlocks="the cast"
+            />
           </div>
         </>
       )}
 
-      {/* 3 — cast */}
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>3 · Cast</h2>
-      {!reached("add_characters") ? (
-        <Locked what="Character definition" blockedBy="adding the novel" />
+      {/* 4 — cast */}
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>4 · Cast</h2>
+      {!series.bible_approved ? (
+        <Locked what="The cast" blockedBy="approving the bible" />
       ) : (
         <>
+          {characters.length === 0 ? (
+            <div className="empty">
+              No characters drafted yet — run the reader above, or add them by hand below.
+            </div>
+          ) : (
+            <p className="note" style={{ marginBottom: 12 }}>
+              Drafted from the novel. Fix any description before generating art — this text goes
+              into every image of that character.
+            </p>
+          )}
+
           <RefPanel seriesId={series.id} refs={(refs ?? []) as any} />
+
           {sheets.length > 0 && (
             <div className="grid" style={{ marginTop: 12 }}>
               {sheets.map((r: any) => (
@@ -107,6 +147,7 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
               ))}
             </div>
           )}
+
           {characters.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <Gate
@@ -121,37 +162,36 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
         </>
       )}
 
-      {/* 4 — episodes */}
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>4 · Episodes</h2>
+      {/* 5 — episodes */}
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>5 · Episodes</h2>
       {!reached("add_episode") ? (
         <Locked what="Episodes" blockedBy="approving the cast" />
       ) : (
         <>
           <EpisodeCreate seriesId={series.id} />
           <div className="grid" style={{ marginTop: 12 }}>
-            {(episodes ?? []).map((e: any) => {
-              const label = EPISODE_STEPS.find((x) => x.id === e.next_step)?.label ?? "Cut";
-              return (
-                <Link
-                  key={e.episode_id}
-                  href={`/studio/${series.id}/episodes/${e.episode_id}`}
-                  className="card"
-                >
-                  <div className="row between">
-                    <div>
-                      <div className="eyebrow">Episode {e.n}</div>
-                      <h3>{e.title}</h3>
-                    </div>
-                    <span className="rail-label" style={{ color: "var(--amber)" }}>{label}</span>
+            {(episodes ?? []).map((e: any) => (
+              <Link
+                key={e.episode_id}
+                href={`/studio/${series.id}/episodes/${e.episode_id}`}
+                className="card"
+              >
+                <div className="row between">
+                  <div>
+                    <div className="eyebrow">Episode {e.n}</div>
+                    <h3>{e.title}</h3>
                   </div>
-                  {e.shots_total > 0 && (
-                    <div className="note mono" style={{ marginTop: 8 }}>
-                      {e.keyframes_done}/{e.shots_total} keyframes · {e.clips_done}/{e.shots_total} clips
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
+                  <span className="rail-label" style={{ color: "var(--amber)" }}>
+                    {EPISODE_STEPS.find((x) => x.id === e.next_step)?.label ?? "Cut"}
+                  </span>
+                </div>
+                {e.shots_total > 0 && (
+                  <div className="note mono" style={{ marginTop: 8 }}>
+                    {e.keyframes_done}/{e.shots_total} keyframes · {e.clips_done}/{e.shots_total} clips
+                  </div>
+                )}
+              </Link>
+            ))}
             {(episodes ?? []).length === 0 && <div className="empty">No episodes yet.</div>}
           </div>
         </>
