@@ -190,9 +190,24 @@ ${text}`,
     description: styleFragment(series.render_style),
   });
 
-  // unique(series_id, kind, name) means a re-run tops up rather than duplicates.
+  // Insert one at a time so a single bad row cannot silently drop the rest,
+  // and so a re-run updates instead of failing on the unique constraint.
   for (const row of rows) {
-    await db.from("refs").upsert(row, { onConflict: "series_id,kind,name" });
+    const { error } = await db
+      .from("refs")
+      .upsert(row, { onConflict: "series_id,kind,name" });
+
+    if (error) {
+      // Older rows may predate the constraint; fall back to a plain update.
+      const { error: updateError } = await db
+        .from("refs")
+        .update({ description: row.description })
+        .eq("series_id", row.series_id)
+        .eq("kind", row.kind)
+        .eq("name", row.name);
+
+      if (updateError) throw new Error(`Could not save ${row.name}: ${error.message}`);
+    }
   }
 
   return {
