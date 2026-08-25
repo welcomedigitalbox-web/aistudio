@@ -4,7 +4,10 @@
 alter table series add column if not exists bootstrap_state text not null default 'idle';
 alter table series add column if not exists bootstrap_error text;
 
-create or replace view series_stage as
+-- Column order changes, so the view has to go before it can come back.
+drop view if exists series_stage;
+
+create view series_stage as
 select
   s.id                as series_id,
   s.title,
