@@ -37,7 +37,7 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
       supabase.from("series_stage").select("*").eq("series_id", params.id).single(),
       supabase
         .from("refs")
-        .select("id, kind, name, description, chosen_image_id, voice_id, ref_images(*)")
+        .select("id, kind, name, description, chosen_image_id, voice_id, ref_images!ref_images_ref_id_fkey(*)")
         .eq("series_id", params.id)
         .order("kind")
         .order("name"),
@@ -55,8 +55,14 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
   const at = order(step);
   const reached = (id: string) => at >= order(id);
 
-  const characters = (refs ?? []).filter((r: any) => r.kind === "character");
-  const sheets = (refs ?? []).filter((r: any) => r.kind !== "style");
+  // PostgREST names the embed after the constraint, so normalise it back.
+  const withImages = (refs ?? []).map((r: any) => ({
+    ...r,
+    ref_images: r.ref_images ?? r["ref_images!ref_images_ref_id_fkey"] ?? [],
+  }));
+
+  const characters = withImages.filter((r: any) => r.kind === "character");
+  const sheets = withImages.filter((r: any) => r.kind !== "style");
   const hasSource = (sources ?? []).some((s: any) => s.state === "ready");
 
   return (
@@ -138,7 +144,7 @@ export default async function ShowPage({ params }: { params: { id: string } }) {
             </p>
           )}
 
-          <RefPanel seriesId={series.id} refs={(refs ?? []) as any} />
+          <RefPanel seriesId={series.id} refs={withImages as any} />
 
           {sheets.length > 0 && (
             <div className="grid" style={{ marginTop: 12 }}>

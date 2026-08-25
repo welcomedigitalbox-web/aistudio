@@ -43,6 +43,35 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
   const [model, setModel] = useState("quality");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(refRow.name);
+  const [description, setDescription] = useState(refRow.description ?? "");
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/refs/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refId: refRow.id, name, description }),
+    });
+    const json = await res.json();
+    setBusy(false);
+    if (!res.ok) return setError(json.error ?? "Could not save.");
+    setEditing(false);
+    router.refresh();
+  }
+
+  async function remove() {
+    setBusy(true);
+    const res = await fetch("/api/refs/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refId: refRow.id, remove: true }),
+    });
+    setBusy(false);
+    if (res.ok) router.refresh();
+  }
 
   const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ?? "";
   const images = refRow.ref_images ?? [];
@@ -82,10 +111,40 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
           <div className="eyebrow">{refRow.kind}</div>
           <h3>{refRow.name}</h3>
         </div>
-        <span className="cost">${spent.toFixed(3)}</span>
+        <div className="row" style={{ gap: 10 }}>
+          <span className="cost">${spent.toFixed(3)}</span>
+          <button
+            className="ghost"
+            onClick={() => setEditing(!editing)}
+            style={{ fontSize: 12, padding: "3px 10px" }}
+          >
+            {editing ? "Close" : "Edit"}
+          </button>
+        </div>
       </div>
 
-      {refRow.description && <p className="note" style={{ margin: 0 }}>{refRow.description}</p>}
+      {editing ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Physical description, used verbatim in every prompt."
+            style={{ minHeight: 90 }}
+          />
+          <div className="row between">
+            <button className="ghost" onClick={remove} disabled={busy}>Delete</button>
+            <button onClick={save} disabled={busy || !name.trim()}>
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+          <span className="note">
+            Changing this after art is generated means regenerating the set.
+          </span>
+        </div>
+      ) : (
+        refRow.description && <p className="note" style={{ margin: 0 }}>{refRow.description}</p>
+      )}
 
       {images.length > 0 && (
         <div
