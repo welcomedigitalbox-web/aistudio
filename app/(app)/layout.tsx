@@ -13,12 +13,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="shell">
       <header className="topbar">
-        <Link href="/dashboard" className="brand">AI STUDIO</Link>
+        <Link href="/studio" className="brand">AI STUDIO</Link>
         <nav>
           <Link href="/dashboard">Dashboard</Link>
-          <Link href="/projects">Projects</Link>
-          <Link href="/writer">Writer</Link>
-          <Link href="/series">Series</Link>
+          <Link href="/studio">Studio</Link>
         </nav>
         <div className="spacer" />
         <span className="mono note">{user.email}</span>

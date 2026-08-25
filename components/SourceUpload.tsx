@@ -4,16 +4,16 @@ import { useRouter } from "next/navigation";
 
 const BASIS = [
   { id: "own", label: "We wrote it" },
-  { id: "licensed", label: "We have rights from the author" },
+  { id: "licensed", label: "Rights from the author" },
   { id: "public_domain", label: "Public domain" },
 ] as const;
 
-export function SourceUpload({ projectId }: { projectId: string }) {
+export function SourceUpload({ seriesId }: { seriesId: string }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [basis, setBasis] = useState<string>("public_domain");
+  const [basis, setBasis] = useState<string>("own");
   const [basisNote, setBasisNote] = useState("");
   const [stage, setStage] = useState<"idle" | "uploading" | "extracting">("idle");
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ export function SourceUpload({ projectId }: { projectId: string }) {
 
     const form = new FormData();
     form.set("file", file);
-    form.set("projectId", projectId);
+    form.set("seriesId", seriesId);
     form.set("title", title);
     form.set("author", author);
     form.set("basis", basis);
@@ -46,22 +46,17 @@ export function SourceUpload({ projectId }: { projectId: string }) {
     });
     const procJson = await proc.json();
     setStage("idle");
-
     if (!proc.ok) return setError(procJson.error ?? "Extraction failed.");
 
     setFile(null);
     setTitle("");
-    setAuthor("");
-    setBasisNote("");
     router.refresh();
   }
 
   const busy = stage !== "idle";
 
   return (
-    <div className="card" style={{ display: "grid", gap: 12 }}>
-      <span className="eyebrow">Add a source</span>
-
+    <div className="card" style={{ display: "grid", gap: 10 }}>
       <input
         type="file"
         accept="application/pdf"
@@ -82,7 +77,7 @@ export function SourceUpload({ projectId }: { projectId: string }) {
       </select>
 
       <input
-        placeholder="Rights note — e.g. published 1904, or licence ref"
+        placeholder="Rights note — optional"
         value={basisNote}
         onChange={(e) => setBasisNote(e.target.value)}
       />
@@ -94,7 +89,7 @@ export function SourceUpload({ projectId }: { projectId: string }) {
           {stage === "idle" && "Text-layer PDFs only. Scans need OCR first."}
         </span>
         <button onClick={submit} disabled={busy || !file || !title}>
-          {busy ? "Working…" : "Add source"}
+          {busy ? "Working…" : "Add"}
         </button>
       </div>
 
