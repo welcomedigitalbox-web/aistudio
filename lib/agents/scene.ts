@@ -42,7 +42,7 @@ export async function planScenes(episodeId: string, note?: string) {
 
   const msg = await client.messages.create({
     model: MODEL,
-    max_tokens: 3000,
+    max_tokens: 8000,
     system: `You are the structure lead in a screenwriting room, planning one
 episode.
 
@@ -105,7 +105,14 @@ ${note ? `Note from the writer:\n${note}` : ""}`,
   try {
     parsed = JSON.parse(raw.replace(/^```json\s*|\s*```$/g, "").trim());
   } catch {
-    throw new Error("The planner did not return valid JSON. Try again.");
+    // A truncated response is the usual cause, so say which it was rather than
+    // sending someone back to the logs.
+    const truncated = msg.stop_reason === "max_tokens";
+    throw new Error(
+      truncated
+        ? "The plan ran past the token limit before it finished. Try again, or ask for fewer scenes in the note."
+        : `The planner did not return valid JSON. It began: ${raw.slice(0, 200)}`
+    );
   }
 
   const scenes = parsed.scenes ?? [];
