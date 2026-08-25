@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 function verify(raw: string, signature: string | null) {
   const secret = process.env.FAL_WEBHOOK_SECRET;
-  if (!secret) return true; // local dev
+  if (!secret) return true;
   if (!signature) return false;
   const expected = crypto.createHmac("sha256", secret).update(raw).digest("hex");
   const a = Buffer.from(expected);
@@ -27,13 +27,26 @@ export async function POST(req: Request) {
   const payload = JSON.parse(raw);
   const db = createServiceClient();
 
-  const { data: row } = await db
+  // Two plain lookups instead of an embed: refs has two foreign keys pointing
+  // at ref_images, so PostgREST cannot resolve the join on its own.
+  const { data: row, error: rowError } = await db
     .from("ref_images")
-    .select("id, ref_id, refs(series_id)")
+    .select("id, ref_id")
     .eq("id", imageId)
-    .single();
+    .maybeSingle();
 
-  if (!row) return NextResponse.json({ error: "Image row not found" }, { status: 404 });
+  if (rowError || !row) {
+    return NextResponse.json(
+      { error: `Image row not found: ${imageId} ${rowError?.message ?? ""}` },
+      { status: 404 }
+    );
+  }
+
+  const { data: ref } = await db
+    .from("refs")
+    .select("series_id")
+    .eq("id", row.ref_id)
+    .maybeSingle();
 
   if (payload.status === "ERROR" || payload.error) {
     await db
@@ -54,14 +67,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const seriesId = (row.refs as any)?.series_id;
-  const key = `refs/${seriesId}/${row.ref_id}/${imageId}.png`;
-  await putFromUrl(key, url, "image/png");
+  try {
+    const key = `refs/${ref?.series_id ?? "unknown"}/${row.ref_id}/${imageId}.png`;
+    await putFromUrl(key, url, "image/png");
 
-  await db
-    .from("ref_images")
-    .update({ storage_key: key, state: "ready", error: null })
-    .eq("id", imageId);
+    await db
+      .from("ref_images")
+      .update({ storage_key: key, state: "ready", error: null })
+      .eq("id", imageId);
+  } catch (e) {
+    await db
+      .from("ref_images")
+      .update({ state: "failed", error: `Storage upload failed: ${(e as Error).message}` })
+      .eq("id", imageId);
+  }
 
   return NextResponse.json({ ok: true });
 }
