@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { planScenes, writeScene } from "@/lib/agents/scene";
 
 // Each call is one small pass, so this stays well inside the function limit.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const supabase = createClient();
