@@ -4,6 +4,7 @@ import { Gate } from "@/components/Gate";
 import { Locked } from "@/components/Locked";
 import { ScenePlanner } from "@/components/ScenePlanner";
 import { SceneList } from "@/components/SceneList";
+import { ShotList } from "@/components/ShotList";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +30,16 @@ export default async function EpisodePage({
 }) {
   const supabase = createClient();
 
-  const [{ data: episode }, { data: stage }, { data: scenes }, { data: series }] =
+  const [{ data: episode }, { data: stage }, { data: scenes }, { data: shots }, { data: series }] =
     await Promise.all([
       supabase.from("episodes").select("*").eq("id", params.episodeId).single(),
       supabase.from("episode_stage").select("*").eq("episode_id", params.episodeId).single(),
       supabase.from("scenes").select("*").eq("episode_id", params.episodeId).order("n"),
+      supabase
+        .from("shots")
+        .select("*, shot_lines(*)")
+        .eq("episode_id", params.episodeId)
+        .order("n"),
       supabase.from("series").select("id, title, render_style").eq("id", params.id).single(),
     ]);
 
@@ -105,10 +111,11 @@ export default async function EpisodePage({
       {!reached("build_shots") ? (
         <Locked what="Shot list" blockedBy="approving the script" />
       ) : (
-        <div className="empty">
-          <strong>Shot list</strong>
-          <div style={{ marginTop: 4 }}>Not built yet — this is the next thing to add.</div>
-        </div>
+        <ShotList
+          scenes={(scenes ?? []) as any}
+          shots={(shots ?? []) as any}
+          locked={episode.shots_approved}
+        />
       )}
     </main>
   );
