@@ -1,4 +1,7 @@
-import pdf from "pdf-parse";
+// Import the internal module directly: pdf-parse's index.js contains debug
+// code that reads a test fixture at load time, which is not shipped in the
+// npm package and breaks the build.
+import pdf from "pdf-parse/lib/pdf-parse.js";
 
 export async function extractText(buffer: Buffer): Promise<string> {
   const result = await pdf(buffer);
