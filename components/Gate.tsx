@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 /**
  * One approval button. Shows what is being approved and what it unlocks, so
  * nobody clicks through a gate without knowing what happens next.
+ *
+ * A creator sees the same card, without the button: the work is finished and
+ * waiting on someone else, which is worth saying rather than hiding.
  */
 export function Gate({
   seriesId,
@@ -13,6 +16,7 @@ export function Gate({
   approved,
   what,
   unlocks,
+  canApprove = true,
 }: {
   seriesId?: string;
   episodeId?: string;
@@ -20,6 +24,7 @@ export function Gate({
   approved: boolean;
   what: string;
   unlocks: string;
+  canApprove?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -44,9 +49,22 @@ export function Gate({
       <div className="card" style={{ borderColor: "var(--pine)" }}>
         <div className="row between">
           <span className="note">{what} — approved.</span>
-          <button className="ghost" onClick={() => set(false)} disabled={busy}>
-            Reopen
-          </button>
+          {canApprove && (
+            <button className="ghost" onClick={() => set(false)} disabled={busy}>
+              Reopen
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!canApprove) {
+    return (
+      <div className="card" style={{ borderColor: "var(--amber)" }}>
+        <strong>{what}</strong>
+        <div className="note" style={{ marginTop: 4 }}>
+          Waiting on a reviewer. Approving unlocks: {unlocks}
         </div>
       </div>
     );
