@@ -26,8 +26,6 @@ const PROVIDER_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-const RANGES = [7, 30, 90];
-
 export function UsageView({
   daily,
   events,
@@ -61,7 +59,7 @@ export function UsageView({
 
   const bars: { day: string; cost: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10);
+    const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
     bars.push({ day: date, cost: dayTotals.get(date) ?? 0 });
   }
 
@@ -74,6 +72,7 @@ export function UsageView({
     byStage.set(e.stage, { cost: prev.cost + Number(e.cost_usd), calls: prev.calls + 1 });
   }
   const stages = [...byStage.entries()].sort((a, b) => b[1].cost - a[1].cost);
+  const topStage = stages.length > 0 ? stages[0][1].cost : 1;
 
   const dayEvents = openDay
     ? filtered.filter((e) => e.created_at.slice(0, 10) === openDay)
@@ -81,19 +80,6 @@ export function UsageView({
 
   return (
     <div style={{ display: "grid", gap: 28, marginTop: 20 }}>
-      <div className="row" style={{ gap: 8 }}>
-        {RANGES.map((r) => (
-          
-            key={r}
-            href={`/usage?days=${r}${selected ? `&provider=${selected}` : ""}`}
-            className={days === r ? "btn" : "btn ghost"}
-            style={{ fontSize: 13, padding: "5px 12px" }}
-          >
-            {r} days
-          </a>
-        ))}
-      </div>
-
       <div>
         <h2 style={{ marginBottom: 12 }}>Accounts</h2>
         <div className="grid two">
@@ -155,10 +141,10 @@ export function UsageView({
             <button
               key={b.day}
               onClick={() => setOpenDay(openDay === b.day ? null : b.day)}
-              title={`${b.day} — $${b.cost.toFixed(4)}`}
+              title={b.day + " — $" + b.cost.toFixed(4)}
               style={{
                 flex: 1,
-                height: `${Math.max((b.cost / peak) * 100, b.cost > 0 ? 2 : 0)}%`,
+                height: Math.max((b.cost / peak) * 100, b.cost > 0 ? 2 : 0) + "%",
                 minHeight: b.cost > 0 ? 2 : 0,
                 background: openDay === b.day ? "var(--ink)" : "var(--pine)",
                 border: "none",
@@ -172,8 +158,10 @@ export function UsageView({
         </div>
 
         <div className="row between" style={{ marginTop: 6 }}>
-          <span className="rail-label">{bars[0]?.day}</span>
-          <span className="rail-label">{bars[bars.length - 1]?.day}</span>
+          <span className="rail-label">{bars.length > 0 ? bars[0].day : ""}</span>
+          <span className="rail-label">
+            {bars.length > 0 ? bars[bars.length - 1].day : ""}
+          </span>
         </div>
 
         {openDay && (
@@ -222,7 +210,7 @@ export function UsageView({
                 <span className="cost">${v.cost.toFixed(4)}</span>
               </div>
               <div className="meter" style={{ marginTop: 8 }}>
-                <i style={{ width: `${(v.cost / (stages[0]?.[1].cost || 1)) * 100}%` }} />
+                <i style={{ width: (v.cost / topStage) * 100 + "%" }} />
               </div>
             </div>
           ))}
