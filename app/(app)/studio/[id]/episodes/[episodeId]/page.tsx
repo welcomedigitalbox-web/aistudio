@@ -5,6 +5,7 @@ import { Locked } from "@/components/Locked";
 import { ScenePlanner } from "@/components/ScenePlanner";
 import { SceneList } from "@/components/SceneList";
 import { ShotList } from "@/components/ShotList";
+import { Production } from "@/components/Production";
 
 export const dynamic = "force-dynamic";
 
@@ -111,10 +112,34 @@ export default async function EpisodePage({
       {!reached("build_shots") ? (
         <Locked what="Shot list" blockedBy="approving the script" />
       ) : (
-        <ShotList
+        <>
+          <ShotList
+            scenes={(scenes ?? []) as any}
+            shots={(shots ?? []) as any}
+            locked={episode.shots_approved}
+          />
+          {(shots ?? []).length > 0 && !episode.shots_approved && (
+            <div style={{ marginTop: 12 }}>
+              <Gate
+                episodeId={episode.id}
+                gate="shots_approved"
+                approved={episode.shots_approved}
+                what={`The shot list (${(shots ?? []).length} shots)`}
+                unlocks="keyframes and clips"
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>4 · Production</h2>
+      {!episode.shots_approved ? (
+        <Locked what="Keyframes and clips" blockedBy="approving the shot list" />
+      ) : (
+        <Production
+          episodeId={episode.id}
           scenes={(scenes ?? []) as any}
           shots={(shots ?? []) as any}
-          locked={episode.shots_approved}
         />
       )}
     </main>
