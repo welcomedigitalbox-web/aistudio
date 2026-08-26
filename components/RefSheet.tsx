@@ -48,6 +48,12 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
   const [description, setDescription] = useState(refRow.description ?? "");
   const [lightbox, setLightbox] = useState<string | null>(null);
 
+  const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ?? "";
+  const images = refRow.ref_images ?? [];
+  const pending = images.filter((i) => i.state === "queued" || i.state === "running");
+  const ready = images.filter((i) => i.state === "ready" && i.storage_key);
+  const spent = images.reduce((s, i) => s + Number(i.cost_usd), 0);
+
   async function save() {
     setBusy(true);
     setError("");
@@ -73,12 +79,6 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
     setBusy(false);
     if (res.ok) router.refresh();
   }
-
-  const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ?? "";
-  const images = refRow.ref_images ?? [];
-  const pending = images.filter((i) => i.state === "queued" || i.state === "running");
-  const ready = images.filter((i) => i.state === "ready" && i.storage_key);
-  const spent = images.reduce((s, i) => s + Number(i.cost_usd), 0);
 
   async function generate() {
     setBusy(true);
@@ -106,20 +106,21 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
     router.refresh();
   }
 
-  /**
-   * Saving every angle at once. The browser blocks rapid programmatic clicks,
-   * so they are spaced out rather than fired in a loop.
-   */
-  async function saveAll() {
-    for (const [i, img] of ready.entries()) {
-      const a = document.createElement("a");
-      a.href = `${base}/${img.storage_key}`;
-      a.download = `${refRow.name}-${img.angle}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      if (i < ready.length - 1) await new Promise((r) => setTimeout(r, 400));
-    }
+  function saveOne(img: RefImage) {
+    const a = document.createElement("a");
+    a.href = base + "/" + img.storage_key;
+    a.download = refRow.name + "-" + img.angle + ".png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // Browsers throttle rapid programmatic downloads, so the clicks are spaced
+  // out with timers rather than fired in a tight loop.
+  function saveAll() {
+    ready.forEach((img, i) => {
+      setTimeout(() => saveOne(img), i * 500);
+    });
   }
 
   return (
@@ -183,11 +184,13 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
         >
           {images.map((img) => {
             const chosen = img.id === refRow.chosen_image_id;
+            const url = img.storage_key ? base + "/" + img.storage_key : null;
+
             return (
               <div
                 key={img.id}
                 style={{
-                  border: `1px solid ${chosen ? "var(--pine)" : "var(--line)"}`,
+                  border: "1px solid " + (chosen ? "var(--pine)" : "var(--line)"),
                   borderRadius: 3,
                   overflow: "hidden",
                   background: "var(--stone)",
@@ -201,11 +204,11 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
                     justifyContent: "center",
                   }}
                 >
-                  {img.state === "ready" && img.storage_key ? (
+                  {img.state === "ready" && url ? (
                     <img
-                      src={`${base}/${img.storage_key}`}
-                      alt={`${refRow.name} — ${img.angle}`}
-                      onClick={() => setLightbox(`${base}/${img.storage_key}`)}
+                      src={url}
+                      alt={refRow.name}
+                      onClick={() => setLightbox(url)}
                       style={{
                         width: "100%",
                         height: "100%",
@@ -222,20 +225,15 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
 
                 <div className="row between" style={{ padding: "6px 8px", gap: 6 }}>
                   <span className="rail-label">{ANGLE_LABEL[img.angle ?? ""] ?? img.angle}</span>
-                  {img.state === "ready" && img.storage_key && (
+                  {img.state === "ready" && url && (
                     <div className="row" style={{ gap: 6 }}>
-                      
-                        href={`${base}/${img.storage_key}`}
-                        download={`${refRow.name}-${img.angle}.png`}
-                        style={{
-                          fontSize: 11,
-                          padding: "2px 8px",
-                          border: "1px solid var(--line)",
-                          borderRadius: "var(--r)",
-                        }}
+                      <button
+                        className="ghost"
+                        onClick={() => saveOne(img)}
+                        style={{ fontSize: 11, padding: "2px 8px" }}
                       >
                         save
-                      </a>
+                      </button>
                       {chosen ? (
                         <span className="rail-label" style={{ color: "var(--pine)" }}>canon</span>
                       ) : (
@@ -296,31 +294,7 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
             src={lightbox}
             alt=""
             onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              cursor: "default",
-            }}
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
           />
-          
-            href={lightbox}
-            download
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "absolute",
-              bottom: 28,
-              padding: "8px 18px",
-              background: "var(--paper)",
-              color: "var(--ink)",
-              borderRadius: "var(--r)",
-              fontSize: 14,
-            }}
-          >
-            Download
-          </a>
         </div>
       )}
-    </div>
-  );
-}
