@@ -46,6 +46,7 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(refRow.name);
   const [description, setDescription] = useState(refRow.description ?? "");
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   async function save() {
     setBusy(true);
@@ -76,6 +77,7 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
   const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ?? "";
   const images = refRow.ref_images ?? [];
   const pending = images.filter((i) => i.state === "queued" || i.state === "running");
+  const ready = images.filter((i) => i.state === "ready" && i.storage_key);
   const spent = images.reduce((s, i) => s + Number(i.cost_usd), 0);
 
   async function generate() {
@@ -104,6 +106,22 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
     router.refresh();
   }
 
+  /**
+   * Saving every angle at once. The browser blocks rapid programmatic clicks,
+   * so they are spaced out rather than fired in a loop.
+   */
+  async function saveAll() {
+    for (const [i, img] of ready.entries()) {
+      const a = document.createElement("a");
+      a.href = `${base}/${img.storage_key}`;
+      a.download = `${refRow.name}-${img.angle}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (i < ready.length - 1) await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+
   return (
     <div className="card" style={{ display: "grid", gap: 12 }}>
       <div className="row between">
@@ -113,6 +131,15 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
         </div>
         <div className="row" style={{ gap: 10 }}>
           <span className="cost">${spent.toFixed(3)}</span>
+          {ready.length > 0 && (
+            <button
+              className="ghost"
+              onClick={saveAll}
+              style={{ fontSize: 12, padding: "3px 10px" }}
+            >
+              Save all
+            </button>
+          )}
           <button
             className="ghost"
             onClick={() => setEditing(!editing)}
@@ -178,7 +205,13 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
                     <img
                       src={`${base}/${img.storage_key}`}
                       alt={`${refRow.name} — ${img.angle}`}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onClick={() => setLightbox(`${base}/${img.storage_key}`)}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        cursor: "zoom-in",
+                      }}
                     />
                   ) : (
                     <span className="note" style={{ fontSize: 12, textAlign: "center", padding: 8 }}>
@@ -189,18 +222,33 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
 
                 <div className="row between" style={{ padding: "6px 8px", gap: 6 }}>
                   <span className="rail-label">{ANGLE_LABEL[img.angle ?? ""] ?? img.angle}</span>
-                  {img.state === "ready" &&
-                    (chosen ? (
-                      <span className="rail-label" style={{ color: "var(--pine)" }}>canon</span>
-                    ) : (
-                      <button
-                        className="ghost"
-                        onClick={() => choose(img.id)}
-                        style={{ fontSize: 11, padding: "2px 8px" }}
+                  {img.state === "ready" && img.storage_key && (
+                    <div className="row" style={{ gap: 6 }}>
+                      
+                        href={`${base}/${img.storage_key}`}
+                        download={`${refRow.name}-${img.angle}.png`}
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          border: "1px solid var(--line)",
+                          borderRadius: "var(--r)",
+                        }}
                       >
-                        use
-                      </button>
-                    ))}
+                        save
+                      </a>
+                      {chosen ? (
+                        <span className="rail-label" style={{ color: "var(--pine)" }}>canon</span>
+                      ) : (
+                        <button
+                          className="ghost"
+                          onClick={() => choose(img.id)}
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                        >
+                          use
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -228,6 +276,51 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
       )}
 
       {error && <div className="err">{error}</div>}
+
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(27, 26, 23, 0.92)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+            cursor: "zoom-out",
+            padding: 32,
+          }}
+        >
+          <img
+            src={lightbox}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+              cursor: "default",
+            }}
+          />
+          
+            href={lightbox}
+            download
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              bottom: 28,
+              padding: "8px 18px",
+              background: "var(--paper)",
+              color: "var(--ink)",
+              borderRadius: "var(--r)",
+              fontSize: 14,
+            }}
+          >
+            Download
+          </a>
+        </div>
+      )}
     </div>
   );
 }
