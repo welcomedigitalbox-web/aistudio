@@ -50,11 +50,20 @@ async function loadSources(labId: string, perSourceChars = 40_000) {
   return blocks.join("\n\n---\n\n");
 }
 
-function parse(raw: string, what: string) {
+function parse(raw: string, what: string, stopReason?: string | null) {
   try {
     return JSON.parse(raw.replace(/^```json\s*|\s*```$/g, "").trim());
   } catch {
-    throw new Error(`The ${what} pass did not return valid JSON. Try again.`);
+    // Running out of tokens mid-object is the usual cause, so name it rather
+    // than sending someone to the logs to find out.
+    if (stopReason === "max_tokens") {
+      throw new Error(
+        `The ${what} ran past the token limit before it finished. Ask for fewer chapters in the note, or shorter summaries.`
+      );
+    }
+    throw new Error(
+      `The ${what} pass did not return valid JSON. It began: ${raw.slice(0, 200)}`
+    );
   }
 }
 
@@ -111,7 +120,7 @@ ${sources}`,
   });
 
   const raw = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  const parsed = parse(raw, "premise");
+  const parsed = parse(raw, "premise", msg.stop_reason);
   const cost = costOf(msg.usage);
 
   await db
@@ -143,7 +152,7 @@ export async function draftOutline(labId: string, note?: string) {
 
   const msg = await client.messages.create({
     model: MODEL,
-    max_tokens: 6000,
+    max_tokens: 12000,
     system: `You are outlining a novel from an agreed premise.
 
 Give ${chapters} chapters. Each needs a summary of what happens and what changes
@@ -178,7 +187,7 @@ ${sources}`,
   });
 
   const raw = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  const parsed = parse(raw, "outline");
+  const parsed = parse(raw, "outline", msg.stop_reason);
   const list = parsed.chapters ?? [];
   if (list.length === 0) throw new Error("The outline came back empty.");
 
