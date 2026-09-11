@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 const ROLES = [
   { id: "spine", label: "Spine", blurb: "The backbone: central want, shape, ending. Pick one." },
@@ -40,20 +41,36 @@ export function LabSources({
     setError("");
     setStage("uploading");
 
-    const form = new FormData();
-    form.set("file", file);
-    form.set("labId", labId);
-    form.set("title", title);
-    form.set("author", author);
-    form.set("basis", basis);
-    form.set("role", role);
+    // Straight to storage: a function body caps at ~4.5MB and novels are bigger.
+    const key = labId + "/" + crypto.randomUUID() + ".pdf";
+    const supabase = createClient();
 
-    const up = await fetch("/api/lab/upload", { method: "POST", body: form });
-    const upJson = await up.json();
+    const { error: upErr } = await supabase.storage
+      .from("sources")
+      .upload(key, file, { contentType: "application/pdf" });
+
+    if (upErr) {
+      setStage("idle");
+      return setError(upErr.message);
+    }
+
+    const up = await fetch("/api/lab/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labId, storageKey: key, title, author, basis, role }),
+    });
+
     if (!up.ok) {
       setStage("idle");
-      return setError(upJson.error ?? "Upload failed.");
+      // A rejected request can come back as plain text, so read defensively.
+      const text = await up.text();
+      try {
+        return setError(JSON.parse(text).error ?? "Upload failed.");
+      } catch {
+        return setError(text.slice(0, 200) || "Upload failed.");
+      }
     }
+    const upJson = await up.json();
 
     setStage("extracting");
     const proc = await fetch("/api/sources/process", {
