@@ -88,10 +88,14 @@ export async function POST(req: Request) {
         }
 
         const pending = list.filter((s) => s.keyframe_approved && !s.clip_storage_key);
-        const total = pending.reduce(
-          (t, s) => t + clipEndpoint(model, Number(s.target_seconds)).usd,
-          0
-        );
+
+        const total =
+          model in OPENLUX_MODELS
+            ? pending.length * OPENLUX_MODELS[model as keyof typeof OPENLUX_MODELS].usd
+            : pending.reduce(
+                (t, s) => t + clipEndpoint(model, Number(s.target_seconds)).usd,
+                0
+              );
         return NextResponse.json({
           count: pending.length,
           estimatedCostUsd: Number(total.toFixed(2)),
