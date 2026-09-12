@@ -39,6 +39,9 @@ const KEYFRAME_MODELS = [
 const CLIP_MODELS = [
   { id: "kling_v1", label: "Kling 1.6 — drafts, ~$0.20/5s" },
   { id: "kling_turbo", label: "Kling 2.5 Turbo — ~$0.35/5s" },
+  { id: "veo_fast", label: "Veo 3.1 Fast — 8s, ~$0.04" },
+  { id: "kling3_turbo", label: "Kling 3.0 Turbo — ~$0.10" },
+  { id: "hailuo23", label: "Hailuo 2.3 — ~$0.24" },
 ];
 
 export function Production({

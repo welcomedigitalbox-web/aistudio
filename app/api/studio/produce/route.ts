@@ -3,6 +3,8 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { generateKeyframe } from "@/lib/production/keyframe";
 import { generateClip, chainScene } from "@/lib/production/clip";
 import { KEYFRAME_MODELS, CLIP_MODELS, clipEndpoint } from "@/lib/production/models";
+import { OPENLUX_MODELS } from "@/lib/production/openlux";
+import { inngest } from "@/lib/inngest/client";
 
 export const maxDuration = 300;
 
@@ -26,6 +28,21 @@ export async function POST(req: Request) {
 
       case "clip": {
         const { shotId, model } = body;
+
+        // Gateway models have no webhook, so the waiting happens in a
+        // background function rather than this request.
+        if (model in OPENLUX_MODELS) {
+          if (!shotId) {
+            return NextResponse.json({ error: "shotId is required." }, { status: 400 });
+          }
+          await inngest.send({
+            name: "openlux/clip.requested",
+            data: { shotId, model },
+          });
+          await db.from("shots").update({ clip_state: "running" }).eq("id", shotId);
+          return NextResponse.json({ queued: true, shotId });
+        }
+
         if (!shotId || !(model in CLIP_MODELS)) {
           return NextResponse.json({ error: "shotId and a valid model are required." }, { status: 400 });
         }
