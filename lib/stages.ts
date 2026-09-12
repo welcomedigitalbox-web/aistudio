@@ -22,6 +22,7 @@ export const EPISODE_STEPS = [
   { id: "build_shots",        label: "Build the shot list" },
   { id: "approve_shots",      label: "Approve the shots" },
   { id: "generate_keyframes", label: "Generate keyframes" },
+  { id: "approve_keyframes",  label: "Approve keyframes" },
   { id: "generate_clips",     label: "Generate clips" },
   { id: "done",               label: "Cut" },
 ] as const;
