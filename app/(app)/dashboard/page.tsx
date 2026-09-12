@@ -1,25 +1,51 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { SERIES_STEPS, EPISODE_STEPS } from "@/lib/stages";
+import { ShowBoard } from "@/components/ShowBoard";
+import { EPISODE_STEPS } from "@/lib/stages";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
   const supabase = createClient();
 
-  const [{ data: shows }, { data: episodes }] = await Promise.all([
-    supabase.from("series_stage").select("*"),
-    supabase.from("episode_stage").select("*").order("n"),
-  ]);
+  const [{ data: stages }, { data: shows }, { data: progress }, { data: people }, { data: episodes }] =
+    await Promise.all([
+      supabase.from("series_stage").select("*"),
+      supabase
+        .from("series")
+        .select("id, title, archived, completed_at, created_by, render_style, target_minutes"),
+      supabase.from("series_progress").select("*"),
+      supabase.from("profiles").select("id, email, full_name"),
+      supabase.from("episode_stage").select("*").order("n"),
+    ]);
+
+  const stageBy = new Map((stages ?? []).map((s: any) => [s.series_id, s]));
+  const progressBy = new Map((progress ?? []).map((p: any) => [p.series_id, p]));
+  const personBy = new Map((people ?? []).map((p: any) => [p.id, p]));
+
+  const rows = (shows ?? []).map((s: any) => {
+    const person = s.created_by ? personBy.get(s.created_by) : null;
+    return {
+      ...s,
+      next_step: stageBy.get(s.id)?.next_step ?? "add_source",
+      characters: stageBy.get(s.id)?.characters ?? 0,
+      characters_ready: stageBy.get(s.id)?.characters_ready ?? 0,
+      episodes: progressBy.get(s.id)?.episodes ?? 0,
+      progress: Number(progressBy.get(s.id)?.progress ?? 0),
+      creator: person?.full_name ?? person?.email ?? null,
+    };
+  });
 
   const waiting = (episodes ?? []).filter((e: any) =>
-    ["approve_script", "approve_plan", "approve_shots"].includes(e.next_step)
+    ["approve_script", "approve_plan", "approve_shots", "approve_keyframes"].includes(e.next_step)
   );
 
   return (
     <main>
       <div className="eyebrow">Overview</div>
-      <h1>{(shows ?? []).length} shows in production</h1>
+      <h1>
+        {rows.filter((r: any) => !r.archived && !r.completed_at).length} shows in production
+      </h1>
 
       <h2 style={{ marginTop: 32, marginBottom: 12 }}>Waiting on you</h2>
       <div className="grid">
@@ -45,25 +71,7 @@ export default async function Dashboard() {
         )}
       </div>
 
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>Shows</h2>
-      <div className="grid two">
-        {(shows ?? []).map((s: any) => (
-          <Link key={s.series_id} href={`/studio/${s.series_id}`} className="card">
-            <div className="row between">
-              <h3>{s.title}</h3>
-              <span className="rail-label" style={{ color: "var(--amber)" }}>
-                {SERIES_STEPS.find((x) => x.id === s.next_step)?.label ?? "Ready"}
-              </span>
-            </div>
-            <div className="note mono" style={{ marginTop: 8 }}>
-              {s.characters_ready}/{s.characters} cast · {s.episodes} episodes
-            </div>
-          </Link>
-        ))}
-        {(shows ?? []).length === 0 && (
-          <div className="empty">No shows yet. Start one in Studio.</div>
-        )}
-      </div>
+      <ShowBoard rows={rows as any} />
     </main>
   );
 }
