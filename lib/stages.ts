@@ -57,7 +57,12 @@ export const RENDER_STYLES = [
     fragment:
       "stylised 3D animation, soft subsurface shading, rounded forms, cinematic depth of field, Pixar-adjacent lighting",
   },
-  { id: "live_action", label: "Live action — photographic" },
+  {
+    id: "live_action",
+    label: "Live action",
+    fragment:
+      "photorealistic live-action cinematography, real photographic image, shot on 35mm film, natural available light, shallow depth of field, fine film grain, no illustration, no animation, no 3D render, no CGI",
+  },
   {
     id: "3d_realistic",
     label: "3D realistic",
