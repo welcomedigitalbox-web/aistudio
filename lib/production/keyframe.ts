@@ -8,10 +8,14 @@ fal.config({ credentials: process.env.FAL_KEY! });
 /**
  * Generate the still for one shot.
  *
- * The prompt is assembled the same way reference art is: style first, then the
- * subjects verbatim from their reference descriptions, then the shot's own
- * composition. Characters keep the exact wording that produced their reference
- * sheet, because rewording it is what makes a face drift.
+ * Where a reference-aware model is chosen and the shot's characters have
+ * chosen art, that art is passed through as an image reference. This is the
+ * difference between a character who looks like themselves in shot 40 and one
+ * who does not: a description is a hope, a reference is a constraint.
+ *
+ * The description still goes in the prompt verbatim — the same words that
+ * produced the reference sheet. Rewording them pulls the model away from the
+ * image it was given.
  */
 export async function generateKeyframe(
   shotId: string,
@@ -33,25 +37,31 @@ export async function generateKeyframe(
     .from("series").select("*").eq("id", episode.series_id).single();
   if (!series) throw new Error("Show not found.");
 
-  // The refs this shot names, with their chosen art.
   const { data: refs } = await db
     .from("refs")
     .select("id, kind, name, description, chosen_image_id")
     .in("id", shot.ref_ids ?? []);
 
-  const chosenIds = (refs ?? []).map((r) => r.chosen_image_id).filter(Boolean) as string[];
+  // Characters first: when a model accepts only a few references, a face
+  // matters more than a wall.
+  const ordered = (refs ?? []).sort((a, b) =>
+    a.kind === "character" ? -1 : b.kind === "character" ? 1 : 0
+  );
+
+  const chosenIds = ordered.map((r) => r.chosen_image_id).filter(Boolean) as string[];
   const { data: images } = chosenIds.length
     ? await db.from("ref_images").select("id, storage_key").in("id", chosenIds)
     : { data: [] };
 
+  const byId = new Map((images ?? []).map((i) => [i.id, i.storage_key]));
   const base = process.env.R2_PUBLIC_BASE_URL ?? "";
-  const refUrls = (images ?? [])
-    .filter((i) => i.storage_key)
-    .map((i) => `${base}/${i.storage_key}`);
 
-  const subjects = (refs ?? [])
-    .map((r) => `${r.name}: ${r.description ?? ""}`)
-    .join(". ");
+  const refUrls = ordered
+    .map((r) => (r.chosen_image_id ? byId.get(r.chosen_image_id) : null))
+    .filter(Boolean)
+    .map((key) => `${base}/${key}`);
+
+  const subjects = ordered.map((r) => `${r.name}: ${r.description ?? ""}`).join(". ");
 
   const prompt = [
     styleFragment(series.render_style),
@@ -80,12 +90,17 @@ export async function generateKeyframe(
     num_images: 1,
   };
 
-  // Reference-aware endpoints anchor on the chosen art; the rest have to make
-  // do with the description, which is why a model that takes references is
-  // worth the extra cent once a show has a cast.
   if (spec.refs && refUrls.length > 0) {
-    input.image_urls = refUrls.slice(0, 4);
+    input.image_urls = refUrls.slice(0, spec.maxRefs ?? 4);
   }
+
+  // Choosing a reference-aware model and then having no references is a silent
+  // downgrade to plain text-to-image, which is the failure this stage exists
+  // to prevent. Say so rather than quietly producing a stranger.
+  const warning =
+    spec.refs && refUrls.length === 0
+      ? "No chosen reference art for this shot's characters — generated from the description alone."
+      : null;
 
   try {
     const { request_id } = await fal.queue.submit(spec.id, {
@@ -101,7 +116,12 @@ export async function generateKeyframe(
       })
       .eq("id", shotId);
 
-    return { shotId, estimatedCostUsd: spec.usd, usedRefs: refUrls.length };
+    return {
+      shotId,
+      estimatedCostUsd: spec.usd,
+      usedRefs: refUrls.length,
+      warning,
+    };
   } catch (e) {
     await db
       .from("shots")

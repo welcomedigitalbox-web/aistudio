@@ -10,42 +10,62 @@ export const KEYFRAME_MODELS = {
     id: "fal-ai/flux/schnell",
     label: "Flux Schnell — draft, $0.003",
     usd: 0.003,
-    /** Whether the endpoint accepts a reference image. */
     refs: false,
+    maxRefs: 0,
   },
   flux: {
     id: "fal-ai/flux/dev",
-    label: "Flux Dev — $0.025",
+    label: "Flux Dev — no references, $0.025",
     usd: 0.025,
     refs: false,
+    maxRefs: 0,
   },
+  /**
+   * Reference-aware. Worth the extra cent on any shot with a face in it: the
+   * model is given the character's chosen art rather than a paragraph about
+   * them.
+   */
   seedream: {
     id: "fal-ai/bytedance/seedream/v4/edit",
-    label: "Seedream — reference-aware, $0.03",
+    label: "Seedream — uses reference art, $0.03",
     usd: 0.03,
     refs: true,
+    maxRefs: 4,
+  },
+  nano: {
+    id: "fal-ai/nano-banana/edit",
+    label: "Nano Banana — uses reference art, $0.04",
+    usd: 0.04,
+    refs: true,
+    maxRefs: 4,
   },
 } as const;
 
 export type KeyframeModel = keyof typeof KEYFRAME_MODELS;
 
 export const CLIP_MODELS = {
+  kling_v1: {
+    label: "Kling 1.6 — drafts",
+    pro: "fal-ai/kling-video/v1.6/pro/image-to-video",
+    std: "fal-ai/kling-video/v1.6/standard/image-to-video",
+    usdPer5s: 0.2,
+  },
   kling_turbo: {
     label: "Kling 2.5 Turbo",
-    /**
-     * Kling splits by mode: professional caps at 5 seconds, standard runs to
-     * 10. A held eight-second shot has to use standard, so the mode follows
-     * the shot length rather than a global setting.
-     */
     pro: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
     std: "fal-ai/kling-video/v2.5-turbo/standard/image-to-video",
     usdPer5s: 0.35,
   },
-  kling_v1: {
-    label: "Kling 1.6 — cheap drafts",
-    pro: "fal-ai/kling-video/v1.6/pro/image-to-video",
-    std: "fal-ai/kling-video/v1.6/standard/image-to-video",
-    usdPer5s: 0.2,
+  /**
+   * Seedance takes a first frame like the others. Its 1.5 line also takes a
+   * last frame, which would make chaining exact rather than hopeful — not
+   * wired up here, but the reason to reach for it later.
+   */
+  seedance: {
+    label: "Seedance 1.0 Pro",
+    pro: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+    std: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+    usdPer5s: 0.47,
   },
 } as const;
 

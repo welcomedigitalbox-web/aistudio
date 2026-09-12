@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RefUpload } from "@/components/RefUpload";
 
 interface RefImage {
   id: string;
@@ -264,9 +265,12 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
             <option key={m.id} value={m.id}>{m.label}</option>
           ))}
         </select>
-        <button onClick={generate} disabled={busy || !refRow.description}>
-          {busy ? "Queueing…" : images.length > 0 ? "Regenerate set" : "Generate set"}
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <RefUpload refId={refRow.id} />
+          <button onClick={generate} disabled={busy || !refRow.description}>
+            {busy ? "Queueing…" : images.length > 0 ? "Regenerate set" : "Generate set"}
+          </button>
+        </div>
       </div>
 
       {!refRow.description && (
