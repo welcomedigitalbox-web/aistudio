@@ -42,6 +42,13 @@ const CLIP_MODELS = [
   { id: "veo_fast", label: "Veo 3.1 Fast — 8s, ~$0.04" },
   { id: "kling3_turbo", label: "Kling 3.0 Turbo — ~$0.10" },
   { id: "hailuo23", label: "Hailuo 2.3 — ~$0.24" },
+  { id: "grok_video", label: "Grok Imagine — ~$0.03" },
+  { id: "wan3", label: "Wan 3.0 — first & last frame, ~$0.04" },
+  { id: "happyhorse", label: "HappyHorse 1.1 — 9 refs, ~$0.09" },
+  { id: "vidu_turbo", label: "Vidu Q3 Turbo — first & last frame, ~$0.09" },
+  { id: "kling_omni", label: "Kling O1 — ~$0.09" },
+  { id: "vidu_pro", label: "Vidu Q3 Pro — ~$0.16" },
+  { id: "seedance15", label: "Seedance 1.5 Pro — first & last frame, ~$1.05" },
 ];
 
 export function Production({
