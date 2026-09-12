@@ -57,6 +57,7 @@ export const RENDER_STYLES = [
     fragment:
       "stylised 3D animation, soft subsurface shading, rounded forms, cinematic depth of field, Pixar-adjacent lighting",
   },
+  { id: "live_action", label: "Live action — photographic" },
   {
     id: "3d_realistic",
     label: "3D realistic",
