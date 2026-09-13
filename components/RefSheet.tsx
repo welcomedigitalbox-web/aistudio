@@ -50,7 +50,10 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ?? "";
-  const images = refRow.ref_images ?? [];
+  // A rejected job produced nothing and cost nothing. Keeping its card on the
+  // sheet makes a working set look broken.
+  const images = (refRow.ref_images ?? []).filter((i) => i.state !== "failed");
+  const failed = (refRow.ref_images ?? []).filter((i) => i.state === "failed").length;
   const pending = images.filter((i) => i.state === "queued" || i.state === "running");
   const ready = images.filter((i) => i.state === "ready" && i.storage_key);
   const spent = images.reduce((s, i) => s + Number(i.cost_usd), 0);
@@ -252,6 +255,12 @@ export function RefSheet({ refRow }: { refRow: RefRow }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {failed > 0 && (
+        <div className="note" style={{ color: "var(--amber)" }}>
+          {failed} refused by the provider — nothing was generated or charged.
         </div>
       )}
 
