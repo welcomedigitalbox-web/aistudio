@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { GatewayProbe } from "@/components/GatewayProbe";
 
 interface Shot {
   id: string;
@@ -162,6 +163,8 @@ export function Production({
           </div>
         </div>
       </div>
+
+      <GatewayProbe />
 
       {error && <div className="err">{error}</div>}
       {running && <div className="note">Submitting {progress}…</div>}
