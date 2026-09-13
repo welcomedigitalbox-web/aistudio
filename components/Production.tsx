@@ -34,23 +34,31 @@ interface Scene {
 
 const KEYFRAME_MODELS = [
   { id: "draft", label: "Flux Schnell — draft, $0.003" },
-  { id: "flux", label: "Flux Dev — $0.025" },
-  { id: "seedream", label: "Seedream — reference-aware, $0.03" },
+  { id: "flux", label: "Flux Dev — no references, $0.025" },
+  { id: "seedream", label: "Seedream — uses reference art, $0.03" },
+  { id: "nano", label: "Nano Banana — uses reference art, $0.04" },
+  { id: "ultra", label: "Flux Pro Ultra — photoreal, $0.06" },
 ];
 
 const CLIP_MODELS = [
-  { id: "kling_v1", label: "Kling 1.6 — drafts, ~$0.20/5s" },
-  { id: "kling_turbo", label: "Kling 2.5 Turbo — ~$0.35/5s" },
-  { id: "veo_fast", label: "Veo 3.1 Fast — 8s, ~$0.04" },
-  { id: "kling3_turbo", label: "Kling 3.0 Turbo — ~$0.10" },
-  { id: "hailuo23", label: "Hailuo 2.3 — ~$0.24" },
-  { id: "grok_video", label: "Grok Imagine — ~$0.03" },
-  { id: "wan3", label: "Wan 3.0 — first & last frame, ~$0.04" },
-  { id: "happyhorse", label: "HappyHorse 1.1 — 9 refs, ~$0.09" },
-  { id: "vidu_turbo", label: "Vidu Q3 Turbo — first & last frame, ~$0.09" },
-  { id: "kling_omni", label: "Kling O1 — ~$0.09" },
-  { id: "vidu_pro", label: "Vidu Q3 Pro — ~$0.16" },
-  { id: "seedance15", label: "Seedance 1.5 Pro — first & last frame, ~$1.05" },
+  { id: "wan", label: "fal · Wan 2.6 — materials, ~$0.25" },
+  { id: "luma", label: "fal · Luma Ray 2 — camera, ~$0.20" },
+  { id: "kling_v1", label: "fal · Kling 1.6 — drafts, ~$0.20" },
+  { id: "veo_lite", label: "fal · Veo 3.1 Lite — realism, ~$0.25" },
+  { id: "grok15", label: "fal · Grok Imagine 1.5 — audio, ~$0.30" },
+  { id: "kling_turbo", label: "fal · Kling 2.5 Turbo — ~$0.35" },
+  { id: "pixverse", label: "fal · PixVerse 5.6 — stylised, ~$0.35" },
+  { id: "happyhorse", label: "fal · HappyHorse 1.0 — ~$0.45" },
+  { id: "hailuo", label: "fal · Hailuo 2.3 — motion, ~$0.49" },
+  { id: "flux3", label: "fal · FLUX 3 Video — ~$0.50" },
+  { id: "seedance15", label: "fal · Seedance 1.5 Pro — end frame, ~$0.62" },
+  { id: "kling3", label: "fal · Kling 3.0 Pro — audio + end frame, ~$0.84" },
+  { id: "veo_full", label: "fal · Veo 3.1 — hero, ~$1.00" },
+  { id: "seedance2", label: "fal · Seedance 2.0 — audio + lip sync, ~$3.41" },
+  { id: "veo_fast", label: "gateway · Veo 3.1 Fast — 8s, ~$0.04" },
+  { id: "wan3", label: "gateway · Wan 3.0 — end frame, ~$0.04" },
+  { id: "kling3_turbo", label: "gateway · Kling 3.0 Turbo — ~$0.10" },
+  { id: "hailuo23", label: "gateway · Hailuo 2.3 — ~$0.24" },
 ];
 
 export function Production({
