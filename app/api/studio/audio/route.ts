@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { speakLine, fitShotsToVoice, VOICE_MODELS } from "@/lib/production/voice";
-import { requestMusic, pollMusic } from "@/lib/production/music";
+import { speakLine, fitShotsToVoice, cloneVoice, VOICE_MODELS } from "@/lib/production/voice";
+import { requestMusic } from "@/lib/production/music";
 
 export const maxDuration = 300;
 
@@ -26,7 +26,21 @@ export async function POST(req: Request) {
         return NextResponse.json(await speakLine(lineId, model, user.id));
       }
 
-      /** Assign a voice to a character. It then reads every line they speak. */
+      /**
+       * Clone from a recording. One minute of clean speech is enough, and
+       * $1.50 buys every line that character will ever speak.
+       */
+      case "clone": {
+        const { refId, audioUrl } = body;
+        if (!refId || !audioUrl) {
+          return NextResponse.json(
+            { error: "refId and audioUrl are required." },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json(await cloneVoice(audioUrl, refId));
+      }
+
       case "assign-voice": {
         const { refId, voiceId, voiceLabel } = body;
         if (!refId) return NextResponse.json({ error: "refId is required." }, { status: 400 });
@@ -56,13 +70,6 @@ export async function POST(req: Request) {
           );
         }
         return NextResponse.json(await requestMusic(episodeId, prompt, user.id));
-      }
-
-      case "poll-music": {
-        if (!body.musicId) {
-          return NextResponse.json({ error: "musicId is required." }, { status: 400 });
-        }
-        return NextResponse.json(await pollMusic(body.musicId));
       }
 
       default:
