@@ -84,23 +84,35 @@ export async function generateKeyframe(
     })
     .eq("id", shotId);
 
-  const input: Record<string, unknown> = {
-    prompt,
-    image_size: series.aspect_ratio === "9:16" ? "portrait_16_9" : "landscape_16_9",
-    num_images: 1,
-  };
+  const input: Record<string, unknown> = { prompt, num_images: 1 };
+
+  // An edit endpoint derives its size from the image it is given; passing one
+  // is rejected.
+  if (!spec.refs) {
+    input.image_size =
+      series.aspect_ratio === "9:16" ? "portrait_16_9" : "landscape_16_9";
+  }
 
   if (spec.refs && refUrls.length > 0) {
     input.image_urls = refUrls.slice(0, spec.maxRefs ?? 4);
   }
 
-  // Choosing a reference-aware model and then having no references is a silent
-  // downgrade to plain text-to-image, which is the failure this stage exists
-  // to prevent. Say so rather than quietly producing a stranger.
-  const warning =
-    spec.refs && refUrls.length === 0
-      ? "No chosen reference art for this shot's characters — generated from the description alone."
-      : null;
+  if (spec.refs && refUrls.length === 0) {
+    await db
+      .from("shots")
+      .update({
+        keyframe_state: "failed",
+        keyframe_error:
+          "This shot has no reference art, and this model edits references rather than generating from text. Use Flux Pro or Seedream for shots with no characters in them.",
+      })
+      .eq("id", shotId);
+
+    throw new Error(
+      "No reference art for this shot. Pick a model that generates from text."
+    );
+  }
+
+  const warning = null;
 
   try {
     const { request_id } = await fal.queue.submit(spec.id, {
