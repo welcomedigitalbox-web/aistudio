@@ -23,7 +23,7 @@ export async function requestMusic(episodeId: string, prompt: string, userId: st
   if (error) throw new Error(error.message);
 
   try {
-    const result: any = await fal.subscribe("cassetteai/music-generator", {
+    const result: any = await fal.subscribe("CassetteAI/music-generator", {
       input: { prompt, duration: 180 },
     });
 
