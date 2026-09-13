@@ -18,6 +18,7 @@ interface Shot {
   keyframe_approved: boolean;
   clip_storage_key: string | null;
   clip_state: string;
+  clip_model: string | null;
   clip_error: string | null;
   clip_seconds: number | null;
   chain_from_shot_id: string | null;
@@ -330,6 +331,15 @@ export function Production({
                       <div className="row between">
                         <span className="mono" style={{ fontSize: 12 }}>
                           {shot.n} · {shot.framing} · {shot.target_seconds}s
+                          {shot.clip_model ? (
+                            <span className="rail-label" style={{ marginLeft: 6 }}>
+                              {shot.clip_model.startsWith("fal-ai") ? "fal" : "gateway"}
+                            </span>
+                          ) : shot.clip_state === "running" ? (
+                            <span className="rail-label" style={{ marginLeft: 6, color: "var(--amber)" }}>
+                              queued
+                            </span>
+                          ) : null}
                         </span>
                         <span className="cost" style={{ fontSize: 11 }}>
                           ${Number(shot.cost_usd).toFixed(3)}

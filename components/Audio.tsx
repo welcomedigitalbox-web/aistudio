@@ -123,13 +123,7 @@ export function Audio({
     router.refresh();
   }
 
-  if (lines.length === 0) {
-    return (
-      <div className="empty">
-        No dialogue in this episode. Music still applies — add a cue below.
-      </div>
-    );
-  }
+  const noDialogue = lines.length === 0;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
