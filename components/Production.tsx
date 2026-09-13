@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface Shot {
@@ -77,6 +77,17 @@ export function Production({
   const pending = shots.filter(
     (s) => s.keyframe_state === "running" || s.clip_state === "running"
   );
+
+  // Poll while jobs are in flight, and stop the moment they are not. The
+  // providers take minutes, and asking someone to keep pressing refresh is
+  // how they end up pressing generate instead.
+  const pendingCount = pending.length;
+
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    const id = setInterval(() => router.refresh(), 10000);
+    return () => clearInterval(id);
+  }, [pendingCount, router]);
   const spent = shots.reduce((t, s) => t + Number(s.cost_usd), 0);
   const runtime = shots.reduce((t, s) => t + Number(s.clip_seconds ?? 0), 0);
 
@@ -154,7 +165,15 @@ export function Production({
       {error && <div className="err">{error}</div>}
       {running && <div className="note">Submitting {progress}…</div>}
       {pending.length > 0 && (
-        <div className="note">{pending.length} still rendering — refresh in a moment.</div>
+        <div className="card" style={{ borderColor: "var(--amber)" }}>
+          <div className="row between">
+            <span className="note">
+              {pending.filter((s) => s.keyframe_state === "running").length} stills and{" "}
+              {pending.filter((s) => s.clip_state === "running").length} clips rendering.
+            </span>
+            <span className="rail-label">updating automatically</span>
+          </div>
+        </div>
       )}
 
       <div className="card" style={{ display: "grid", gap: 10 }}>
