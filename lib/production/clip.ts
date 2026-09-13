@@ -61,7 +61,12 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
         // Kling v3 calls it start_image_url; most others image_url. A wrong
         // field name fails the same way a wrong endpoint does.
         [CLIP_MODELS[model].imageField]: startFrame,
-        duration: String(duration),
+        // Kling accepts only "5" or "10" as strings; Wan accepts any whole
+        // number from 2 to 10. Send what the model asked for.
+        duration:
+          (CLIP_MODELS[model] as any).durationKind === "seconds"
+            ? Math.max(2, Math.min(10, Math.round(Number(shot.target_seconds))))
+            : String(duration),
         negative_prompt: "text, watermark, subtitles, distorted face, extra limbs",
       },
       webhookUrl: `${process.env.APP_URL}/api/webhooks/fal-shot?shot=${shotId}&kind=clip`,

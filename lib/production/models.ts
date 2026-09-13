@@ -50,6 +50,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v1.6/standard/image-to-video",
     usdPer5s: 0.2,
     imageField: "image_url",
+    durationKind: "kling" as const,
   },
 
   kling_turbo: {
@@ -58,6 +59,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v2.5-turbo/standard/image-to-video",
     usdPer5s: 0.35,
     imageField: "image_url",
+    durationKind: "kling" as const,
   },
 
   /** Audio in Chinese and English, 3 to 15 seconds, end frame supported. */
@@ -67,6 +69,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v3/standard/image-to-video",
     usdPer5s: 0.56,
     imageField: "start_image_url",
+    durationKind: "kling" as const,
   },
 
   kling3: {
@@ -75,6 +78,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v3/pro/image-to-video",
     usdPer5s: 0.84,
     imageField: "start_image_url",
+    durationKind: "kling" as const,
   },
 
   /**
@@ -87,6 +91,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v3/4k/image-to-video",
     usdPer5s: 2.1,
     imageField: "start_image_url",
+    durationKind: "kling" as const,
   },
 
   /** Start and end frame, animating the transition between them. */
@@ -96,6 +101,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/o3/pro/image-to-video",
     usdPer5s: 1.0,
     imageField: "start_image_url",
+    durationKind: "kling" as const,
   },
 
   /** Note the missing fal-ai prefix — this is how fal lists it. */
@@ -105,6 +111,7 @@ export const CLIP_MODELS = {
     std: "bytedance/seedance-2.0/image-to-video",
     usdPer5s: 3.41,
     imageField: "image_url",
+    durationKind: "kling" as const,
   },
 
   seedance2_mini: {
@@ -113,6 +120,7 @@ export const CLIP_MODELS = {
     std: "bytedance/seedance-2.0-mini/image-to-video",
     usdPer5s: 1.2,
     imageField: "image_url",
+    durationKind: "kling" as const,
   },
 
   veo_fast_fal: {
@@ -121,6 +129,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/veo3.1/fast/image-to-video",
     usdPer5s: 0.75,
     imageField: "image_url",
+    durationKind: "kling" as const,
   },
 
   veo_full: {
@@ -129,6 +138,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/veo3.1/image-to-video",
     usdPer5s: 1.0,
     imageField: "image_url",
+    durationKind: "kling" as const,
   },
 
   wan27: {
@@ -137,6 +147,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/wan/v2.7/image-to-video",
     usdPer5s: 0.3,
     imageField: "image_url",
+    durationKind: "seconds" as const,
   },
 } as const;
 
