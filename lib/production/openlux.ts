@@ -107,6 +107,13 @@ export const OPENLUX_MODELS = {
 
 export type OpenluxModel = keyof typeof OPENLUX_MODELS;
 
+/** Where a model lives. Most share /v1/videos; some do not. */
+function pathFor(model: OpenluxModel) {
+  const id = OPENLUX_MODELS[model].model;
+  if (id.startsWith("MiniMax")) return "/minimax/v1/video_generation";
+  return "/v1/videos";
+}
+
 function key() {
   const k = process.env.OPENLUX_API_KEY;
   if (!k) throw new Error("OPENLUX_API_KEY is not set.");
@@ -134,7 +141,7 @@ export async function submitClip(opts: {
   form.set("seconds", String(seconds));
   form.set("size", opts.aspect === "9:16" ? "9:16" : "16:9");
 
-  const res = await fetch(`${BASE}/v1/videos`, {
+  const res = await fetch(`${BASE}${pathFor(opts.model)}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key()}` },
     body: form,
