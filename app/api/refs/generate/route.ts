@@ -100,7 +100,10 @@ export async function POST(req: Request) {
         input: {
           prompt,
           seed,
-          image_size: ref.kind === "character" ? "portrait_4_3" : "landscape_16_9",
+          image_size:
+            ref.kind === "character"
+              ? { width: 1080, height: 1440 }
+              : { width: 1920, height: 1080 },
           num_images: 1,
         },
         webhookUrl: `${webhookUrl}?image=${row.id}`,
