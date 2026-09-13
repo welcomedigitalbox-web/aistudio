@@ -41,24 +41,17 @@ const KEYFRAME_MODELS = [
 ];
 
 const CLIP_MODELS = [
-  { id: "wan", label: "fal · Wan 2.6 — materials, ~$0.25" },
-  { id: "luma", label: "fal · Luma Ray 2 — camera, ~$0.20" },
-  { id: "kling_v1", label: "fal · Kling 1.6 — drafts, ~$0.20" },
-  { id: "veo_lite", label: "fal · Veo 3.1 Lite — realism, ~$0.25" },
-  { id: "grok15", label: "fal · Grok Imagine 1.5 — audio, ~$0.30" },
-  { id: "kling_turbo", label: "fal · Kling 2.5 Turbo — ~$0.35" },
-  { id: "pixverse", label: "fal · PixVerse 5.6 — stylised, ~$0.35" },
-  { id: "happyhorse", label: "fal · HappyHorse 1.0 — ~$0.45" },
-  { id: "hailuo", label: "fal · Hailuo 2.3 — motion, ~$0.49" },
-  { id: "flux3", label: "fal · FLUX 3 Video — ~$0.50" },
-  { id: "seedance15", label: "fal · Seedance 1.5 Pro — end frame, ~$0.62" },
-  { id: "kling3", label: "fal · Kling 3.0 Pro — audio + end frame, ~$0.84" },
-  { id: "veo_full", label: "fal · Veo 3.1 — hero, ~$1.00" },
-  { id: "seedance2", label: "fal · Seedance 2.0 — audio + lip sync, ~$3.41" },
-  { id: "veo_fast", label: "gateway · Veo 3.1 Fast — 8s, ~$0.04" },
-  { id: "wan3", label: "gateway · Wan 3.0 — end frame, ~$0.04" },
-  { id: "kling3_turbo", label: "gateway · Kling 3.0 Turbo — ~$0.10" },
-  { id: "hailuo23", label: "gateway · Hailuo 2.3 — ~$0.24" },
+  { id: "kling_v1", label: "Kling 1.6 — drafts, ~$0.20" },
+  { id: "wan27", label: "Wan 2.7 — materials, ~$0.30" },
+  { id: "kling_turbo", label: "Kling 2.5 Turbo — ~$0.35" },
+  { id: "kling3_std", label: "Kling 3.0 Standard — audio, ~$0.56" },
+  { id: "veo_fast_fal", label: "Veo 3.1 Fast — ~$0.75" },
+  { id: "kling3", label: "Kling 3.0 Pro — audio + end frame, ~$0.84" },
+  { id: "kling_o3", label: "Kling O3 Pro — first & last frame, ~$1.00" },
+  { id: "veo_full", label: "Veo 3.1 — hero, ~$1.00" },
+  { id: "seedance2_mini", label: "Seedance 2.0 Mini — ~$1.20" },
+  { id: "kling3_4k", label: "Kling 3.0 — native 4K, ~$2.10" },
+  { id: "seedance2", label: "Seedance 2.0 — audio + lip sync, ~$3.41" },
 ];
 
 export function Production({

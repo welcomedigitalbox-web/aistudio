@@ -6,6 +6,7 @@ import { ScenePlanner } from "@/components/ScenePlanner";
 import { SceneList } from "@/components/SceneList";
 import { ShotList } from "@/components/ShotList";
 import { Production } from "@/components/Production";
+import { ModelCast } from "@/components/ModelCast";
 import { Audio } from "@/components/Audio";
 
 export const dynamic = "force-dynamic";
@@ -155,7 +156,14 @@ export default async function EpisodePage({
         />
       )}
 
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>5 · Production</h2>
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>5 · Casting the models</h2>
+      {!episode.shots_approved ? (
+        <Locked what="Model casting" blockedBy="approving the shot list" />
+      ) : (
+        <ModelCast episodeId={episode.id} shots={(shots ?? []) as any} />
+      )}
+
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>6 · Production</h2>
       {!episode.shots_approved ? (
         <Locked what="Keyframes and clips" blockedBy="approving the shot list" />
       ) : (

@@ -1,6 +1,6 @@
 import * as fal from "@fal-ai/serverless-client";
 import { createServiceClient } from "@/lib/supabase/server";
-import { clipEndpoint, type ClipModel } from "./models";
+import { clipEndpoint, CLIP_MODELS, type ClipModel } from "./models";
 
 fal.config({ credentials: process.env.FAL_KEY! });
 
@@ -58,7 +58,9 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
     const { request_id } = await fal.queue.submit(endpoint, {
       input: {
         prompt: shot.motion || shot.visual,
-        image_url: startFrame,
+        // Kling v3 calls it start_image_url; most others image_url. A wrong
+        // field name fails the same way a wrong endpoint does.
+        [CLIP_MODELS[model].imageField]: startFrame,
         duration: String(duration),
         negative_prompt: "text, watermark, subtitles, distorted face, extra limbs",
       },

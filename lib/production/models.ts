@@ -44,114 +44,99 @@ export const KEYFRAME_MODELS = {
 export type KeyframeModel = keyof typeof KEYFRAME_MODELS;
 
 export const CLIP_MODELS = {
-  wan: {
-    label: "Wan 2.6 — materials, cheap",
-    pro: "fal-ai/wan/v2.6/image-to-video",
-    std: "fal-ai/wan/v2.6/image-to-video",
-    usdPer5s: 0.25,
-  },
-
-  luma: {
-    label: "Luma Ray 2 — camera movement",
-    pro: "fal-ai/luma-dream-machine/ray-2/image-to-video",
-    std: "fal-ai/luma-dream-machine/ray-2/image-to-video",
-    usdPer5s: 0.2,
-  },
-
-  veo_lite: {
-    label: "Veo 3.1 Lite — realism, audio",
-    pro: "fal-ai/veo3.1/lite/image-to-video",
-    std: "fal-ai/veo3.1/lite/image-to-video",
-    usdPer5s: 0.25,
-  },
-
-  grok15: {
-    label: "Grok Imagine 1.5 — audio",
-    pro: "fal-ai/grok-imagine/v1.5/image-to-video",
-    std: "fal-ai/grok-imagine/v1.5/image-to-video",
-    usdPer5s: 0.3,
-  },
-
-  pixverse: {
-    label: "PixVerse 5.6 — stylised",
-    pro: "fal-ai/pixverse/v5.6/image-to-video",
-    std: "fal-ai/pixverse/v5.6/image-to-video",
-    usdPer5s: 0.35,
-  },
-
-  happyhorse: {
-    label: "HappyHorse 1.0 — quality-first",
-    pro: "fal-ai/happyhorse/v1/image-to-video",
-    std: "fal-ai/happyhorse/v1/image-to-video",
-    usdPer5s: 0.45,
-  },
-
-  hailuo: {
-    label: "Hailuo 2.3 — motion and physics",
-    pro: "fal-ai/minimax/hailuo-02/pro/image-to-video",
-    std: "fal-ai/minimax/hailuo-02/standard/image-to-video",
-    usdPer5s: 0.49,
-  },
-
-  flux3: {
-    label: "FLUX 3 Video — animates a still",
-    pro: "fal-ai/flux-3/image-to-video",
-    std: "fal-ai/flux-3/image-to-video",
-    usdPer5s: 0.5,
-  },
-
-  seedance15: {
-    label: "Seedance 1.5 Pro — first & last frame",
-    pro: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
-    std: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
-    usdPer5s: 0.62,
-  },
-
-  /** Audio included, at half Veo's rate. The value pick for dialogue-free work. */
-  kling3: {
-    label: "Kling 3.0 Pro — audio, end frame",
-    pro: "fal-ai/kling-video/v3/pro/image-to-video",
-    std: "fal-ai/kling-video/v3/pro/image-to-video",
-    usdPer5s: 0.84,
-  },
-
-  /** Priced without audio; with audio it doubles, so ask for it deliberately. */
-  veo_full: {
-    label: "Veo 3.1 — hero shots",
-    pro: "fal-ai/veo3.1/image-to-video",
-    std: "fal-ai/veo3.1/image-to-video",
-    usdPer5s: 1.0,
-  },
-
-  seedance2: {
-    label: "Seedance 2.0 — audio, lip sync",
-    pro: "fal-ai/bytedance/seedance-2.0/image-to-video",
-    std: "fal-ai/bytedance/seedance-2.0/image-to-video",
-    usdPer5s: 3.41,
-  },
-
   kling_v1: {
     label: "Kling 1.6 — drafts",
     pro: "fal-ai/kling-video/v1.6/pro/image-to-video",
     std: "fal-ai/kling-video/v1.6/standard/image-to-video",
     usdPer5s: 0.2,
+    imageField: "image_url",
   },
+
   kling_turbo: {
     label: "Kling 2.5 Turbo",
     pro: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
     std: "fal-ai/kling-video/v2.5-turbo/standard/image-to-video",
     usdPer5s: 0.35,
+    imageField: "image_url",
   },
+
+  /** Audio in Chinese and English, 3 to 15 seconds, end frame supported. */
+  kling3_std: {
+    label: "Kling 3.0 Standard — audio",
+    pro: "fal-ai/kling-video/v3/standard/image-to-video",
+    std: "fal-ai/kling-video/v3/standard/image-to-video",
+    usdPer5s: 0.56,
+    imageField: "start_image_url",
+  },
+
+  kling3: {
+    label: "Kling 3.0 Pro — audio, end frame",
+    pro: "fal-ai/kling-video/v3/pro/image-to-video",
+    std: "fal-ai/kling-video/v3/pro/image-to-video",
+    usdPer5s: 0.84,
+    imageField: "start_image_url",
+  },
+
   /**
-   * Seedance takes a first frame like the others. Its 1.5 line also takes a
-   * last frame, which would make chaining exact rather than hopeful — not
-   * wired up here, but the reason to reach for it later.
+   * Native 4K in one step — no upscaling pass. $0.42 a second whether audio
+   * is on or off, so leave it on.
    */
-  seedance: {
-    label: "Seedance 1.0 Pro",
-    pro: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
-    std: "fal-ai/bytedance/seedance/v1/pro/image-to-video",
-    usdPer5s: 0.47,
+  kling3_4k: {
+    label: "Kling 3.0 — native 4K",
+    pro: "fal-ai/kling-video/v3/4k/image-to-video",
+    std: "fal-ai/kling-video/v3/4k/image-to-video",
+    usdPer5s: 2.1,
+    imageField: "start_image_url",
+  },
+
+  /** Start and end frame, animating the transition between them. */
+  kling_o3: {
+    label: "Kling O3 Pro — first & last frame",
+    pro: "fal-ai/kling-video/o3/pro/image-to-video",
+    std: "fal-ai/kling-video/o3/pro/image-to-video",
+    usdPer5s: 1.0,
+    imageField: "start_image_url",
+  },
+
+  /** Note the missing fal-ai prefix — this is how fal lists it. */
+  seedance2: {
+    label: "Seedance 2.0 — audio, multi-shot",
+    pro: "bytedance/seedance-2.0/image-to-video",
+    std: "bytedance/seedance-2.0/image-to-video",
+    usdPer5s: 3.41,
+    imageField: "image_url",
+  },
+
+  seedance2_mini: {
+    label: "Seedance 2.0 Mini — faster, cheaper",
+    pro: "bytedance/seedance-2.0-mini/image-to-video",
+    std: "bytedance/seedance-2.0-mini/image-to-video",
+    usdPer5s: 1.2,
+    imageField: "image_url",
+  },
+
+  veo_fast_fal: {
+    label: "Veo 3.1 Fast",
+    pro: "fal-ai/veo3.1/fast/image-to-video",
+    std: "fal-ai/veo3.1/fast/image-to-video",
+    usdPer5s: 0.75,
+    imageField: "image_url",
+  },
+
+  veo_full: {
+    label: "Veo 3.1 — hero shots",
+    pro: "fal-ai/veo3.1/image-to-video",
+    std: "fal-ai/veo3.1/image-to-video",
+    usdPer5s: 1.0,
+    imageField: "image_url",
+  },
+
+  wan27: {
+    label: "Wan 2.7 — materials",
+    pro: "fal-ai/wan/v2.7/image-to-video",
+    std: "fal-ai/wan/v2.7/image-to-video",
+    usdPer5s: 0.3,
+    imageField: "image_url",
   },
 } as const;
 
