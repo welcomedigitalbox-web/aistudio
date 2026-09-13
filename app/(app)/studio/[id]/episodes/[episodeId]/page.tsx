@@ -6,6 +6,7 @@ import { ScenePlanner } from "@/components/ScenePlanner";
 import { SceneList } from "@/components/SceneList";
 import { ShotList } from "@/components/ShotList";
 import { Production } from "@/components/Production";
+import { Audio } from "@/components/Audio";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function EpisodePage({
 }) {
   const supabase = createClient();
 
-  const [{ data: episode }, { data: stage }, { data: scenes }, { data: shots }, { data: series }] =
+  const [{ data: episode }, { data: stage }, { data: scenes }, { data: shots }, { data: characters }, { data: music }, { data: series }] =
     await Promise.all([
       supabase.from("episodes").select("*").eq("id", params.episodeId).single(),
       supabase.from("episode_stage").select("*").eq("episode_id", params.episodeId).single(),
@@ -41,6 +42,16 @@ export default async function EpisodePage({
         .select("*, shot_lines(*)")
         .eq("episode_id", params.episodeId)
         .order("n"),
+      supabase
+        .from("refs")
+        .select("id, name, voice_id, voice_label")
+        .eq("series_id", params.id)
+        .eq("kind", "character"),
+      supabase
+        .from("episode_music")
+        .select("*")
+        .eq("episode_id", params.episodeId)
+        .order("created_at", { ascending: false }),
       supabase.from("series").select("id, title, render_style").eq("id", params.id).single(),
     ]);
 
@@ -132,7 +143,19 @@ export default async function EpisodePage({
         </>
       )}
 
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>4 · Production</h2>
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>4 · Voice</h2>
+      {!episode.shots_approved ? (
+        <Locked what="Voice" blockedBy="approving the shot list" />
+      ) : (
+        <Audio
+          episodeId={episode.id}
+          shots={(shots ?? []) as any}
+          characters={(characters ?? []) as any}
+          music={(music ?? []) as any}
+        />
+      )}
+
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>5 · Production</h2>
       {!episode.shots_approved ? (
         <Locked what="Keyframes and clips" blockedBy="approving the shot list" />
       ) : (

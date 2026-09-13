@@ -28,3 +28,17 @@ export async function putFromUrl(key: string, sourceUrl: string, contentType?: s
 export function publicUrl(key: string) {
   return `${process.env.R2_PUBLIC_BASE_URL}/${key}`;
 }
+
+
+/** Store bytes we already hold, rather than fetching from a URL. */
+export async function putBuffer(key: string, body: Buffer, contentType: string) {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET!,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+  return key;
+}
