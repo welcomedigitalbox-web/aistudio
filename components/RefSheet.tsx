@@ -24,7 +24,8 @@ interface RefRow {
 const MODELS = [
   { id: "fast", label: "Flux Schnell — draft, $0.003" },
   { id: "quality", label: "Flux Dev — $0.025" },
-  { id: "seedream", label: "Seedream — $0.03" },
+  { id: "seedream", label: "Seedream — reference-aware, $0.03" },
+  { id: "nano", label: "Nano Banana — sharper faces, $0.04" },
 ];
 
 const ANGLE_LABEL: Record<string, string> = {
