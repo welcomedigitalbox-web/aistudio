@@ -123,7 +123,7 @@ export function Production({
       setProgress(`${i + 1} of ${list.length}`);
       const ok = await call({ action, shotId: shot.id, model }, shot.id);
       if (!ok) break;
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 1500));
     }
     setRunning(false);
     setProgress("");
