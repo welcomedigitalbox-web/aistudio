@@ -39,21 +39,22 @@ interface Music {
 }
 
 const VOICE_MODELS = [
-  { id: "turbo", label: "Speech 2.6 Turbo — ~$0.012" },
-  { id: "hd", label: "Speech 2.8 HD — ~$0.021" },
-  { id: "gpt_mini", label: "GPT-4o mini TTS — ~$0.013" },
+  { id: "eleven", label: "ElevenLabs v3 — expressive, ~$0.10/1k" },
+  { id: "eleven_multi", label: "ElevenLabs Multilingual v2 — ~$0.10/1k" },
+  { id: "minimax_hd", label: "MiniMax Speech 2.8 HD — ~$0.10/1k" },
+  { id: "minimax_clone", label: "Cloned voice — ~$0.10/1k" },
 ];
 
 const STOCK_VOICES = [
   { id: "", label: "unassigned" },
-  { id: "male-qn-qingse", label: "Young man — light" },
-  { id: "male-qn-jingying", label: "Man — steady" },
-  { id: "male-qn-badao", label: "Man — hard" },
-  { id: "audiobook_male_1", label: "Man — narrator" },
-  { id: "female-shaonv", label: "Young woman — light" },
-  { id: "female-yujie", label: "Woman — warm" },
-  { id: "female-chengshu", label: "Woman — older" },
-  { id: "audiobook_female_1", label: "Woman — narrator" },
+  { id: "Rachel", label: "Woman — warm (Eleven)" },
+  { id: "Adam", label: "Man — steady (Eleven)" },
+  { id: "Antoni", label: "Man — light (Eleven)" },
+  { id: "Bella", label: "Young woman (Eleven)" },
+  { id: "male-qn-jingying", label: "Man — steady (MiniMax)" },
+  { id: "female-yujie", label: "Woman — warm (MiniMax)" },
+  { id: "audiobook_male_1", label: "Man — narrator (MiniMax)" },
+  { id: "audiobook_female_1", label: "Woman — narrator (MiniMax)" },
 ];
 
 export function Audio({
@@ -68,7 +69,7 @@ export function Audio({
   music: Music[];
 }) {
   const router = useRouter();
-  const [model, setModel] = useState("turbo");
+  const [model, setModel] = useState("eleven");
   const [busy, setBusy] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
