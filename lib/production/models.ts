@@ -25,6 +25,14 @@ export const KEYFRAME_MODELS = {
    * model is given the character's chosen art rather than a paragraph about
    * them.
    */
+  ultra: {
+    id: "fal-ai/flux-pro/v1.1-ultra",
+    label: "Flux Pro Ultra — photoreal, no references, $0.06",
+    usd: 0.06,
+    refs: false,
+    maxRefs: 0,
+  },
+
   seedream: {
     id: "fal-ai/bytedance/seedream/v4/edit",
     label: "Seedream — uses reference art, $0.03",
