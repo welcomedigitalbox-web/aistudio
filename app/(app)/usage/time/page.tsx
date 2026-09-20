@@ -4,12 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 const RANGES = [
-  { days: 1,   label: "Today" },
-  { days: 7,   label: "7 days" },
-  { days: 30,  label: "30 days" },
-  { days: 90,  label: "90 days" },
-  { days: 0,   label: "All" },
+  { key: "today",     label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "7",         label: "7 days" },
+  { key: "30",        label: "30 days" },
+  { key: "90",        label: "90 days" },
+  { key: "all",       label: "All" },
 ] as const;
+
+/** What each trainee committed to, per day. */
+const COMMITMENT_MIN = 120;
 
 const hm = (mins: number) => {
   const m = Math.round(mins);
@@ -17,27 +21,43 @@ const hm = (mins: number) => {
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 };
 
-/** Dubai's calendar day, which is what the views bucket by. */
-function dayKey(offsetDays = 0) {
-  const now = new Date(Date.now() - offsetDays * 86_400_000);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(now);
-}
+/** Dubai's calendar day, which is what every view here buckets by. */
+const dayKey = (offset = 0) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" })
+    .format(new Date(Date.now() - offset * 86_400_000));
+
+const weekday = (day: string) =>
+  new Date(day + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short" });
 
 const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-GB", {
     hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai",
   });
 
-const weekday = (day: string) =>
-  new Date(day + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short" });
+/** A range key becomes an inclusive [from, to] pair of Dubai dates. */
+function windowFor(key: string): { from: string | null; to: string | null; label: string } {
+  switch (key) {
+    case "today":     return { from: dayKey(0),  to: dayKey(0), label: "Today" };
+    case "yesterday": return { from: dayKey(1),  to: dayKey(1), label: "Yesterday" };
+    case "30":        return { from: dayKey(29), to: null,      label: "30 days" };
+    case "90":        return { from: dayKey(89), to: null,      label: "90 days" };
+    case "all":       return { from: null,       to: null,      label: "All" };
+    default:          return { from: dayKey(6),  to: null,      label: "7 days" };
+  }
+}
 
 /**
  * Time on the app, per person per day.
  *
- * Two columns on purpose. "Open" is the tab being up; "active" is somebody at
- * the keyboard within the last minute. A long open with a short active is a
- * forgotten tab, and reading one without the other says the wrong thing about
- * the day.
+ * Two numbers, and they are not interchangeable. "Open" is the tab being up;
+ * "active" is somebody at the keyboard within the last minute. Waiting for a
+ * chapter to generate is open but not active -- which is why the commitment
+ * table measures open, and why reading one number without the other says the
+ * wrong thing about the day.
+ *
+ * Every grouping happens in SQL (20260920000004_time_views.sql). The page
+ * fetches tens of rows rather than tens of thousands, which is what makes the
+ * range buttons feel instant.
  */
 export default async function TimePage({
   searchParams,
@@ -46,78 +66,70 @@ export default async function TimePage({
 }) {
   const supabase = createClient();
 
-  const days = RANGES.some((r) => String(r.days) === searchParams.range)
-    ? Number(searchParams.range)
-    : 7;
-  const since = days > 0 ? dayKey(days - 1) : null;
+  const key = RANGES.some((r) => r.key === searchParams.range) ? searchParams.range! : "7";
+  const { from, to, label } = windowFor(key);
 
-  let dailyQ = supabase.from("usage_time_daily").select("*");
-  let labQ = supabase.from("usage_time_by_lab").select("*");
-  if (since) {
-    dailyQ = dailyQ.gte("day", since);
-    labQ = labQ.gte("day", since);
-  }
+  const scope = (q: any) => {
+    if (from) q = q.gte("day", from);
+    if (to) q = q.lte("day", to);
+    return q;
+  };
 
-  // Chapters carry their own created_at, so output history reaches back
-  // before presence tracking existed -- which is most of the record.
-  const [{ data: daily }, { data: byLab }, { data: chapters }] = await Promise.all([
-    dailyQ.order("day", { ascending: false }).limit(400),
-    labQ.order("day", { ascending: false }).limit(400),
-    supabase
-      .from("lab_chapters")
-      .select("created_at, cost_usd, body, lab_projects(created_by)")
-      .not("body", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(2000),
-  ]);
+  const [{ data: daily }, { data: byLab }, { data: hourly }, { data: output }] =
+    await Promise.all([
+      scope(supabase.from("usage_time_daily").select("*"))
+        .order("day", { ascending: false }).limit(500),
+      scope(supabase.from("usage_time_by_lab").select("*"))
+        .order("day", { ascending: false }).limit(500),
+      scope(supabase.from("usage_time_hourly").select("who, hour, minutes_active")),
+      scope(supabase.from("usage_output_daily").select("*"))
+        .order("day", { ascending: false }).limit(500),
+    ]);
 
-  const { data: profiles } = await supabase.from("profiles").select("id, email, full_name");
-  const nameById = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name ?? p.email]));
+  const rows = (daily ?? []) as any[];
 
-  // Group by Dubai day + author.
-  const output = new Map<string, { day: string; who: string; n: number; cost: number }>();
-  for (const c of (chapters ?? []) as any[]) {
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" })
-      .format(new Date(c.created_at));
-    if (since && day < since) continue;
-    const who = nameById.get(c.lab_projects?.created_by) ?? "unattributed";
-    const key = day + "|" + who;
-    const row = output.get(key) ?? { day, who, n: 0, cost: 0 };
-    row.n += 1;
-    row.cost += Number(c.cost_usd ?? 0);
-    output.set(key, row);
-  }
-  const outputRows = [...output.values()].sort(
-    (a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.n - a.n)
-  );
-
-  const rows = daily ?? [];
-
-  // Per person, across the chosen window.
+  // ---- per person, across the window
   const people = new Map<
     string,
-    { email: string; name: string | null; open: number; active: number; days: Set<string> }
+    { who: string; open: number; active: number; days: Set<string>; met: number }
   >();
-
-  for (const r of rows as any[]) {
-    const p = people.get(r.email) ?? {
-      email: r.email,
-      name: r.full_name,
-      open: 0,
-      active: 0,
-      days: new Set<string>(),
-    };
+  for (const r of rows) {
+    const who = r.full_name ?? r.email;
+    const p = people.get(who) ?? { who, open: 0, active: 0, days: new Set<string>(), met: 0 };
     p.open += Number(r.minutes_open);
     p.active += Number(r.minutes_active);
     p.days.add(r.day);
-    people.set(r.email, p);
+    if (Number(r.minutes_open) >= COMMITMENT_MIN) p.met += 1;
+    people.set(who, p);
   }
 
   const ranked = [...people.values()].sort((a, b) => b.active - a.active);
-  const top = ranked[0]?.active ?? 0;
+  const topActive = ranked[0]?.active ?? 0;
+  const commitRows = [...people.values()].sort(
+    (a, b) => b.met - a.met || b.open - a.open
+  );
 
-  const label = RANGES.find((r) => r.days === days)?.label ?? "7 days";
-  const rangeText = since ? `${since} → ${dayKey(0)}` : "everything recorded";
+  // ---- hour-of-day grid
+  const grid = new Map<string, number[]>();
+  for (const h of (hourly ?? []) as any[]) {
+    const row = grid.get(h.who) ?? new Array(24).fill(0);
+    row[h.hour] += Number(h.minutes_active);
+    grid.set(h.who, row);
+  }
+  const gridRows = [...grid.entries()]
+    .map(([who, row]) => ({ who, row, total: row.reduce((a, b) => a + b, 0) }))
+    .filter((g) => g.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const peak = Math.max(1, ...gridRows.flatMap((g) => g.row));
+  const worked = gridRows.flatMap((g) =>
+    g.row.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0)
+  );
+  const firstHour = worked.length ? Math.min(...worked) : 9;
+  const lastHour = worked.length ? Math.max(...worked) : 18;
+  const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i);
+
+  const rangeText = from && to ? from : from ? `${from} → ${dayKey(0)}` : "everything recorded";
 
   return (
     <main>
@@ -130,20 +142,95 @@ export default async function TimePage({
 
       <div className="filters" style={{ marginTop: 20 }}>
         {RANGES.map((r) => (
-          <Link
-            key={r.days}
-            href={`/usage/time?range=${r.days}`}
-            data-on={r.days === days}
-          >
+          <Link key={r.key} href={`/usage/time?range=${r.key}`} data-on={r.key === key}>
             {r.label}
           </Link>
         ))}
-        <span className="note mono" style={{ marginLeft: 6, fontSize: 12 }}>
-          {rangeText}
-        </span>
+        <span className="note mono" style={{ marginLeft: 6, fontSize: 12 }}>{rangeText}</span>
       </div>
 
-      <h2 style={{ marginTop: 32, marginBottom: 12 }}>Per person · {label}</h2>
+      <h2 style={{ marginTop: 32, marginBottom: 6 }}>Commitment · 2h a day</h2>
+      <p className="note" style={{ marginBottom: 12, maxWidth: 640 }}>
+        Measured on <strong>open</strong>, not active: waiting for a chapter to
+        generate is working, and it produces no keystrokes for minutes at a time.
+      </p>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Person</th>
+              <th className="num">Days seen</th>
+              <th className="num">Days met</th>
+              <th className="num">Rate</th>
+              <th className="num">Avg / day</th>
+              <th className="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {commitRows.map((c) => {
+              const rate = c.days.size ? c.met / c.days.size : 0;
+              return (
+                <tr key={c.who}>
+                  <td>{c.who}</td>
+                  <td className="num mono dim">{c.days.size}</td>
+                  <td className="num mono">{c.met}</td>
+                  <td className="num mono barcell" style={{ ["--w" as any]: `${rate * 100}%` }}>
+                    <span>{Math.round(rate * 100)}%</span>
+                  </td>
+                  <td className="num mono dim">{hm(c.open / c.days.size)}</td>
+                  <td className="num mono dim">{hm(c.open)}</td>
+                </tr>
+              );
+            })}
+            {commitRows.length === 0 && (
+              <tr><td colSpan={6} className="dim">Nothing recorded in this window.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style={{ marginTop: 36, marginBottom: 6 }}>When people work</h2>
+      <p className="note" style={{ marginBottom: 12, maxWidth: 640 }}>
+        Active minutes by hour of day, Dubai time. Darker means more.
+      </p>
+      <div className="table-wrap">
+        <table className="table heat">
+          <thead>
+            <tr>
+              <th>Person</th>
+              {hours.map((h) => (
+                <th key={h} className="num">{String(h).padStart(2, "0")}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {gridRows.map((g) => (
+              <tr key={g.who}>
+                <td>{g.who}</td>
+                {hours.map((h) => (
+                  <td
+                    key={h}
+                    className="num mono heatcell"
+                    style={{ ["--i" as any]: g.row[h] / peak }}
+                    title={`${g.who} · ${String(h).padStart(2, "0")}:00 · ${hm(g.row[h])}`}
+                  >
+                    {g.row[h] ? Math.round(g.row[h]) : ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {gridRows.length === 0 && (
+              <tr>
+                <td colSpan={hours.length + 1} className="dim">
+                  No active minutes recorded in this window.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>Per person · {label}</h2>
       <div className="table-wrap">
         <table className="table">
           <thead>
@@ -157,12 +244,12 @@ export default async function TimePage({
           </thead>
           <tbody>
             {ranked.map((p) => (
-              <tr key={p.email}>
+              <tr key={p.who}>
                 <td
                   className="barcell"
-                  style={{ ["--w" as any]: `${top ? (p.active / top) * 100 : 0}%` }}
+                  style={{ ["--w" as any]: `${topActive ? (p.active / topActive) * 100 : 0}%` }}
                 >
-                  <span>{p.name ?? p.email}</span>
+                  <span>{p.who}</span>
                 </td>
                 <td className="num mono">{hm(p.active)}</td>
                 <td className="num mono dim">{hm(p.open)}</td>
@@ -171,11 +258,7 @@ export default async function TimePage({
               </tr>
             ))}
             {ranked.length === 0 && (
-              <tr>
-                <td colSpan={5} className="dim">
-                  Nothing recorded in this window.
-                </td>
-              </tr>
+              <tr><td colSpan={5} className="dim">Nothing recorded in this window.</td></tr>
             )}
           </tbody>
         </table>
@@ -195,7 +278,7 @@ export default async function TimePage({
             </tr>
           </thead>
           <tbody>
-            {(rows as any[]).map((r, i) => (
+            {rows.map((r, i) => (
               <tr key={i}>
                 <td className="mono">
                   {r.day} <span className="dim">{weekday(r.day)}</span>
@@ -208,50 +291,16 @@ export default async function TimePage({
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="dim">
-                  Nothing recorded in this window.
-                </td>
-              </tr>
+              <tr><td colSpan={6} className="dim">Nothing recorded in this window.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>By story</h2>
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Person</th>
-              <th>Story</th>
-              <th className="num">Active</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(byLab ?? []).map((r: any, i: number) => (
-              <tr key={i}>
-                <td className="mono">{r.day}</td>
-                <td>{r.email}</td>
-                <td>{r.lab_title}</td>
-                <td className="num mono">{hm(Number(r.minutes_active))}</td>
-              </tr>
-            ))}
-            {(byLab ?? []).length === 0 && (
-              <tr>
-                <td colSpan={4} className="dim">
-                  No story-level time yet. It fills in as people work inside a lab.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <h2 style={{ marginTop: 36, marginBottom: 12 }}>Chapters written by day</h2>
-      <p className="note" style={{ marginTop: -4, marginBottom: 12, maxWidth: 640 }}>
-        Reaches back further than the time table — chapters have always carried a
-        timestamp, so this is the record before presence tracking started.
+      <h2 style={{ marginTop: 36, marginBottom: 6 }}>Chapters written by day</h2>
+      <p className="note" style={{ marginBottom: 12, maxWidth: 640 }}>
+        Reaches back further than the tables above — chapters have always carried a
+        timestamp, so this is the record from before presence tracking started.
       </p>
       <div className="table-wrap">
         <table className="table">
@@ -265,20 +314,48 @@ export default async function TimePage({
             </tr>
           </thead>
           <tbody>
-            {outputRows.map((r, i) => (
+            {((output ?? []) as any[]).map((r, i) => (
               <tr key={i}>
                 <td className="mono">
                   {r.day} <span className="dim">{weekday(r.day)}</span>
                 </td>
                 <td>{r.who}</td>
-                <td className="num mono">{r.n}</td>
-                <td className="num mono dim">${r.cost.toFixed(3)}</td>
-                <td className="num mono dim">${(r.cost / r.n).toFixed(3)}</td>
+                <td className="num mono">{r.chapters}</td>
+                <td className="num mono dim">${Number(r.cost_usd).toFixed(3)}</td>
+                <td className="num mono dim">
+                  ${(Number(r.cost_usd) / r.chapters).toFixed(3)}
+                </td>
               </tr>
             ))}
-            {outputRows.length === 0 && (
+            {(output ?? []).length === 0 && (
+              <tr><td colSpan={5} className="dim">No chapters written in this window.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>By story</h2>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Person</th><th>Story</th><th className="num">Active</th>
+            </tr>
+          </thead>
+          <tbody>
+            {((byLab ?? []) as any[]).map((r, i) => (
+              <tr key={i}>
+                <td className="mono">{r.day}</td>
+                <td>{r.email}</td>
+                <td>{r.lab_title}</td>
+                <td className="num mono">{hm(Number(r.minutes_active))}</td>
+              </tr>
+            ))}
+            {(byLab ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="dim">No chapters written in this window.</td>
+                <td colSpan={4} className="dim">
+                  No story-level time yet. It fills in as people work inside a lab.
+                </td>
               </tr>
             )}
           </tbody>
