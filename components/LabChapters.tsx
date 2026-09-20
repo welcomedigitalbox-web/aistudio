@@ -10,6 +10,9 @@ interface Chapter {
   body: string | null;
   approved: boolean;
   cost_usd: number;
+  submitted_at: string | null;
+  approved_at: string | null;
+  review_note: string | null;
 }
 
 export function LabChapters({
@@ -18,12 +21,16 @@ export function LabChapters({
   hasOutline,
   hasPremise,
   exported,
+  readOnly = false,
+  canReview = false,
 }: {
   labId: string;
   chapters: Chapter[];
   hasOutline: boolean;
   hasPremise: boolean;
   exported: boolean;
+  readOnly?: boolean;
+  canReview?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -91,6 +98,23 @@ export function LabChapters({
     router.refresh();
   }
 
+  /** Hand a finished chapter to whoever signs off. */
+  async function submit(chapterId: string) {
+    setBusy(chapterId);
+    setError("");
+    await call({ action: "submit-chapter", chapterId });
+    setBusy(null);
+    router.refresh();
+  }
+
+  async function decide(chapterId: string, approved: boolean) {
+    setBusy(chapterId);
+    setError("");
+    await call({ action: "approve-chapter", chapterId, approved });
+    setBusy(null);
+    router.refresh();
+  }
+
   if (!hasPremise) {
     return <div className="empty">Settle the premise before outlining.</div>;
   }
@@ -126,7 +150,7 @@ export function LabChapters({
           <span className="note">
             {chapters.length - unwritten.length}/{chapters.length} written · ${spent.toFixed(3)}
           </span>
-          {unwritten.length > 0 && !exported && (
+          {unwritten.length > 0 && !exported && !readOnly && (
             <button onClick={writeAll} disabled={runningAll || busy !== null}>
               {runningAll
                 ? `Writing… (${chapters.length - unwritten.length}/${chapters.length})`
@@ -160,7 +184,7 @@ export function LabChapters({
                 ) : (
                   <span className="rail-label">not written</span>
                 )}
-                {!exported && c.body && (
+                {!exported && !readOnly && c.body && (
                   <button
                     className="ghost"
                     onClick={() => {
@@ -173,7 +197,7 @@ export function LabChapters({
                     {isEditing ? "Cancel" : "Edit"}
                   </button>
                 )}
-                {!exported && (
+                {!exported && !readOnly && (
                   <button
                     className="ghost"
                     onClick={() => write(c.id)}
@@ -186,6 +210,47 @@ export function LabChapters({
             </div>
 
             {c.summary && <p className="note" style={{ marginTop: 6 }}>{c.summary}</p>}
+
+            {/* Sign-off. A chapter is written, then submitted, then approved --
+                three states, because "written" and "agreed" are not the same. */}
+            {c.body && !exported && (
+              <div
+                className="row between"
+                style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}
+              >
+                <span className="rail-label" style={{
+                  color: c.approved ? "var(--pine)"
+                       : c.submitted_at ? "var(--amber)" : undefined,
+                }}>
+                  {c.approved ? "approved"
+                    : c.submitted_at ? "waiting on review" : "draft"}
+                  {c.review_note && !c.approved ? ` — ${c.review_note}` : ""}
+                </span>
+
+                <div className="row" style={{ gap: 8 }}>
+                  {!c.approved && !c.submitted_at && !readOnly && (
+                    <button className="ghost" onClick={() => submit(c.id)} disabled={busy !== null}>
+                      {busy === c.id ? "…" : "Send for review"}
+                    </button>
+                  )}
+                  {canReview && c.submitted_at && !c.approved && (
+                    <>
+                      <button className="ghost" onClick={() => decide(c.id, false)} disabled={busy !== null}>
+                        Send back
+                      </button>
+                      <button onClick={() => decide(c.id, true)} disabled={busy !== null}>
+                        {busy === c.id ? "…" : "Approve"}
+                      </button>
+                    </>
+                  )}
+                  {canReview && c.approved && (
+                    <button className="ghost" onClick={() => decide(c.id, false)} disabled={busy !== null}>
+                      Reopen
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {isOpen && isEditing && (
               <div style={{ marginTop: 12, display: "grid", gap: 8 }}>

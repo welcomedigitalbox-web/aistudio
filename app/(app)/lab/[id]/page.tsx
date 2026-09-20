@@ -5,6 +5,7 @@ import { LabSources } from "@/components/LabSources";
 import { LabPremise } from "@/components/LabPremise";
 import { LabChapters } from "@/components/LabChapters";
 import { LabExport } from "@/components/LabExport";
+import { LabShare } from "@/components/LabShare";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ const order = (id: string) => STEPS.findIndex((s) => s.id === id);
 export default async function LabPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
 
-  const [{ data: lab }, { data: stage }, { data: sources }, { data: chapters }] =
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const [{ data: lab }, { data: stage }, { data: sources }, { data: chapters }, { data: grants }, { data: me }] =
     await Promise.all([
       supabase.from("lab_projects").select("*").eq("id", params.id).single(),
       supabase.from("lab_stage").select("*").eq("lab_id", params.id).maybeSingle(),
@@ -31,9 +34,27 @@ export default async function LabPage({ params }: { params: { id: string } }) {
         .select("source_id, role, note, sources(title, author, state)")
         .eq("lab_id", params.id),
       supabase.from("lab_chapters").select("*").eq("lab_id", params.id).order("n"),
+      supabase
+        .from("lab_access")
+        .select("user_id, access, profiles(email, full_name)")
+        .eq("lab_id", params.id),
+      supabase.from("profiles").select("role").eq("id", user?.id ?? "").maybeSingle(),
     ]);
 
-  if (!lab) return <main><div className="empty">That story does not exist.</div></main>;
+  // A missing row here is RLS doing its job as often as it is a bad id, so the
+  // message covers both without guessing which.
+  if (!lab) {
+    return (
+      <main>
+        <div className="empty">That story does not exist, or it has not been shared with you.</div>
+      </main>
+    );
+  }
+
+  const isOwner = lab.created_by === user?.id || me?.role === "admin";
+  const myGrant = (grants ?? []).find((g: any) => g.user_id === user?.id)?.access;
+  const canReview = isOwner || myGrant === "reviewer" || me?.role === "reviewer";
+  const readOnly = !isOwner && myGrant !== "editor";
 
   const step = stage?.next_step ?? "add_sources";
   const at = order(step);
@@ -78,6 +99,8 @@ export default async function LabPage({ params }: { params: { id: string } }) {
           hasOutline={(chapters ?? []).length > 0}
           hasPremise={!!lab.premise}
           exported={!!lab.exported_source_id}
+          readOnly={readOnly}
+          canReview={canReview}
         />
       )}
 
@@ -91,6 +114,13 @@ export default async function LabPage({ params }: { params: { id: string } }) {
           exportedSourceId={lab.exported_source_id}
           unwritten={unwritten}
         />
+      )}
+
+      {isOwner && (
+        <>
+          <h2 style={{ marginTop: 36, marginBottom: 12 }}>5 · Access</h2>
+          <LabShare labId={lab.id} grants={(grants ?? []) as any} />
+        </>
       )}
     </main>
   );
