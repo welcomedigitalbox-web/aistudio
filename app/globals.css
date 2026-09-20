@@ -188,3 +188,22 @@ textarea { min-height: 100px; resize: vertical; }
   border-color: var(--ink);
   color: var(--stone);
 }
+
+.table.heat td, .table.heat th { padding: 7px 8px; font-size: 12px; }
+.table.heat td:first-child, .table.heat th:first-child {
+  padding-left: 14px; white-space: nowrap;
+}
+.heatcell {
+  position: relative;
+  z-index: 0;
+  color: var(--muted);
+  min-width: 30px;
+}
+.heatcell::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: var(--pine);
+  opacity: calc(var(--i, 0) * 0.55);
+  border-radius: 2px;
+}

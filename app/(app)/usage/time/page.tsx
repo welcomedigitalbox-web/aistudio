@@ -58,10 +58,38 @@ export default async function TimePage({
     labQ = labQ.gte("day", since);
   }
 
-  const [{ data: daily }, { data: byLab }] = await Promise.all([
+  // Chapters carry their own created_at, so output history reaches back
+  // before presence tracking existed -- which is most of the record.
+  const [{ data: daily }, { data: byLab }, { data: chapters }] = await Promise.all([
     dailyQ.order("day", { ascending: false }).limit(400),
     labQ.order("day", { ascending: false }).limit(400),
+    supabase
+      .from("lab_chapters")
+      .select("created_at, cost_usd, body, lab_projects(created_by)")
+      .not("body", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(2000),
   ]);
+
+  const { data: profiles } = await supabase.from("profiles").select("id, email, full_name");
+  const nameById = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name ?? p.email]));
+
+  // Group by Dubai day + author.
+  const output = new Map<string, { day: string; who: string; n: number; cost: number }>();
+  for (const c of (chapters ?? []) as any[]) {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" })
+      .format(new Date(c.created_at));
+    if (since && day < since) continue;
+    const who = nameById.get(c.lab_projects?.created_by) ?? "unattributed";
+    const key = day + "|" + who;
+    const row = output.get(key) ?? { day, who, n: 0, cost: 0 };
+    row.n += 1;
+    row.cost += Number(c.cost_usd ?? 0);
+    output.set(key, row);
+  }
+  const outputRows = [...output.values()].sort(
+    (a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.n - a.n)
+  );
 
   const rows = daily ?? [];
 
@@ -215,6 +243,42 @@ export default async function TimePage({
                 <td colSpan={4} className="dim">
                   No story-level time yet. It fills in as people work inside a lab.
                 </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <h2 style={{ marginTop: 36, marginBottom: 12 }}>Chapters written by day</h2>
+      <p className="note" style={{ marginTop: -4, marginBottom: 12, maxWidth: 640 }}>
+        Reaches back further than the time table — chapters have always carried a
+        timestamp, so this is the record before presence tracking started.
+      </p>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Person</th>
+              <th className="num">Chapters</th>
+              <th className="num">Cost</th>
+              <th className="num">Per chapter</th>
+            </tr>
+          </thead>
+          <tbody>
+            {outputRows.map((r, i) => (
+              <tr key={i}>
+                <td className="mono">
+                  {r.day} <span className="dim">{weekday(r.day)}</span>
+                </td>
+                <td>{r.who}</td>
+                <td className="num mono">{r.n}</td>
+                <td className="num mono dim">${r.cost.toFixed(3)}</td>
+                <td className="num mono dim">${(r.cost / r.n).toFixed(3)}</td>
+              </tr>
+            ))}
+            {outputRows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="dim">No chapters written in this window.</td>
               </tr>
             )}
           </tbody>
