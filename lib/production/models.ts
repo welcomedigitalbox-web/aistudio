@@ -40,6 +40,22 @@ export const KEYFRAME_MODELS = {
     refs: true,
     maxRefs: 4,
   },
+  grok_image: {
+    id: "xai/grok-imagine-image/v2.0/edit",
+    label: "Grok Imagine 2.0 — uses reference art, $0.05",
+    usd: 0.05,
+    refs: true,
+    maxRefs: 4,
+  },
+
+  grok_text: {
+    id: "xai/grok-imagine-image/v2.0/text-to-image",
+    label: "Grok Imagine 2.0 — text only, $0.04",
+    usd: 0.04,
+    refs: false,
+    maxRefs: 0,
+  },
+
   nano: {
     id: "fal-ai/nano-banana/edit",
     label: "Nano Banana — uses reference art, $0.04",
