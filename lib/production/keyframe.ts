@@ -124,8 +124,14 @@ export async function generateKeyframe(
     input.image_size = portrait ? "portrait_16_9" : "landscape_16_9";
   }
 
-  if (spec.refs && refUrls.length > 0) {
+  if (spec.refs && refUrls.length > 0 && !useText) {
     input.image_urls = refUrls.slice(0, spec.maxRefs ?? 4);
+    /**
+     * Reference sheets are front-on, posed and looking at the lens. Without
+     * this the model copies that pose too, and a man meant to be leaping a
+     * roof squats on it smiling at the camera.
+     */
+    input.prompt = `${prompt}. The reference images show only who the people are and what they wear: keep their faces and costume, but do NOT copy the pose, framing, background or lighting of the reference images. Nobody looks at the camera; they are caught mid-action in the scene as described, like a frame from a film.`;
   }
 
   if (spec.refs && refUrls.length === 0 && !useText) {
