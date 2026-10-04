@@ -46,14 +46,14 @@ const CLIP_MODELS = [
   { id: "kling_v1", label: "Kling 1.6 — drafts, ~$0.20" },
   { id: "wan27", label: "Wan 2.7 — materials, ~$0.30" },
   { id: "kling_turbo", label: "Kling 2.5 Turbo — ~$0.35" },
-  { id: "kling3_std", label: "Kling 3.0 Standard — audio, ~$0.56" },
+  { id: "kling3_std", label: "Kling 3.0 Standard — ~$0.42" },
   { id: "veo_fast_fal", label: "Veo 3.1 Fast — ~$0.75" },
-  { id: "kling3", label: "Kling 3.0 Pro — audio + end frame, ~$0.84" },
+  { id: "kling3", label: "Kling 3.0 Pro — end frame, ~$0.56" },
   { id: "kling_o3", label: "Kling O3 Pro — first & last frame, ~$1.00" },
   { id: "veo_full", label: "Veo 3.1 — hero, ~$1.00" },
   { id: "seedance2_mini", label: "Seedance 2.0 Mini — ~$1.20" },
   { id: "kling3_4k", label: "Kling 3.0 — native 4K, ~$2.10" },
-  { id: "seedance2", label: "Seedance 2.0 — audio + lip sync, ~$3.41" },
+  { id: "seedance2", label: "Seedance 2.0 — ~$3.41" },
 ];
 
 export function Production({

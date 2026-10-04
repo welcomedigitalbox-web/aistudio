@@ -94,7 +94,13 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
 
   const liveAction = series?.render_style === "live_action";
   const aspect = series?.aspect_ratio === "9:16" ? "9:16" : "16:9";
-  const hasAudio = spec.durationKind === "veo" || spec.durationKind === "seedance" || spec.durationKind === "kling3";
+  /**
+   * Native audio is off. Voice and music are made separately and laid in at
+   * the edit, so model audio is never used — and it is not free: Veo 3.1 bills
+   * $0.40/s with audio against $0.20/s without, Kling 3.0 Pro $0.168 against
+   * $0.112. Off also stops a model inventing English speech over a shot.
+   */
+  const hasAudio = false;
 
   const prompt = clipPrompt({
     style: styleFragment(series?.render_style ?? "live_action"),
@@ -111,10 +117,15 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
   if (spec.durationKind === "veo") {
     extra.resolution = "1080p";
     extra.aspect_ratio = aspect;
+    extra.generate_audio = false;
+  }
+  if (spec.durationKind === "kling3") {
+    extra.generate_audio = false;
   }
   if (spec.durationKind === "seedance") {
     extra.resolution = "1080p";
     extra.aspect_ratio = aspect;
+    extra.generate_audio = false;
   }
 
   await db

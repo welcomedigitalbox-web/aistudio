@@ -99,21 +99,22 @@ export const CLIP_MODELS = {
     durationKind: "kling" as const,
   },
 
-  /** Audio in Chinese and English, 3 to 15 seconds, end frame supported. */
+  /** 3 to 15 seconds, end frame supported. Billed audio-off: $0.084/s. */
   kling3_std: {
-    label: "Kling 3.0 Standard — audio",
+    label: "Kling 3.0 Standard",
     pro: "fal-ai/kling-video/v3/standard/image-to-video",
     std: "fal-ai/kling-video/v3/standard/image-to-video",
-    usdPer5s: 0.56,
+    usdPer5s: 0.42,
     imageField: "start_image_url",
     durationKind: "kling3" as const,
   },
 
+  /** Billed audio-off: $0.112/s. */
   kling3: {
-    label: "Kling 3.0 Pro — audio, end frame",
+    label: "Kling 3.0 Pro — end frame",
     pro: "fal-ai/kling-video/v3/pro/image-to-video",
     std: "fal-ai/kling-video/v3/pro/image-to-video",
-    usdPer5s: 0.84,
+    usdPer5s: 0.56,
     imageField: "start_image_url",
     durationKind: "kling3" as const,
   },
