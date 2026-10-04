@@ -57,7 +57,7 @@ export async function draftBible(seriesId: string) {
   const msg = await client.messages.create({
     model: MODEL,
     max_tokens: 2500,
-    system: `You are the showrunner adapting a novel into an animated series.
+    system: `You are the showrunner adapting a novel into a ${series.render_style === "live_action" ? "live-action" : "animated"} series.
 
 Read the novel and write the show bible: the rules that hold across every
 episode. This document is fed to every agent on every episode, so it has to be
@@ -124,7 +124,7 @@ export async function draftCast(seriesId: string) {
   const msg = await client.messages.create({
     model: MODEL,
     max_tokens: 4000,
-    system: `You are the character designer for an animated adaptation.
+    system: `You are the character designer for ${series.render_style === "live_action" ? "a live-action adaptation: describe real people and real costume, never drawn or cartoon features" : "an animated adaptation"}.
 
 Read the novel and list the characters and the recurring locations. For each,
 write a description that will be pasted VERBATIM into every image prompt for

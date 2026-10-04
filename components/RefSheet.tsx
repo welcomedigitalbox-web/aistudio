@@ -22,13 +22,13 @@ interface RefRow {
 }
 
 const MODELS = [
-  { id: "fast", label: "Flux Schnell — draft, $0.003" },
-  { id: "seedream", label: "Seedream — reference-aware, $0.03" },
-  { id: "nano", label: "Nano Banana — uses reference art, $0.04" },
+  { id: "nano_pro", label: "Nano Banana Pro — every angle locked to one face, $0.15" },
+  { id: "nano", label: "Nano Banana — angles locked to one face, $0.04" },
+  { id: "seedream", label: "Seedream 4 — angles locked to one face, $0.03" },
+  { id: "ultra", label: "Flux Pro Ultra — photoreal, no face lock, $0.06" },
+  { id: "grok_image", label: "Grok Imagine 2.0 — angles locked to one face, $0.05" },
   { id: "grok_text", label: "Grok Imagine 2.0 — text only, $0.04" },
-  { id: "grok_image", label: "Grok Imagine 2.0 — uses reference art, $0.05" },
-  { id: "ultra", label: "Flux Pro Ultra — photoreal, $0.06" },
-  { id: "nano", label: "Nano Banana — sharper faces, $0.04" },
+  { id: "fast", label: "Flux Schnell — draft, $0.003" },
 ];
 
 const ANGLE_LABEL: Record<string, string> = {
@@ -45,7 +45,7 @@ const ANGLE_LABEL: Record<string, string> = {
 
 export function RefSheet({ refRow }: { refRow: RefRow }) {
   const router = useRouter();
-  const [model, setModel] = useState("quality");
+  const [model, setModel] = useState("nano_pro");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
