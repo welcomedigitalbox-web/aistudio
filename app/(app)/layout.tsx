@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Presence } from "@/components/Presence";
 import { Bell } from "@/components/Bell";
+import { HelpAssistant } from "@/components/HelpAssistant";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <Presence />
       {children}
+      <HelpAssistant />
     </div>
   );
 }
