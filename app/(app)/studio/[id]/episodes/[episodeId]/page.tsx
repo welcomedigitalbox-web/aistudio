@@ -130,7 +130,7 @@ export default async function EpisodePage({
             shots={(shots ?? []) as any}
             locked={episode.shots_approved}
           />
-          {(shots ?? []).length > 0 && !episode.shots_approved && (
+          {(shots ?? []).length > 0 && (
             <div style={{ marginTop: 12 }}>
               <Gate
                 episodeId={episode.id}
