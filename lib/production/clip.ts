@@ -1,6 +1,45 @@
 import * as fal from "@fal-ai/serverless-client";
 import { createServiceClient } from "@/lib/supabase/server";
+import { styleFragment } from "@/lib/stages";
 import { clipEndpoint, CLIP_MODELS, type ClipModel } from "./models";
+
+/**
+ * The video model sees the start frame plus this text and nothing else, so the
+ * text has to carry the whole shot: who, where, the light, the lens, then the
+ * change. A bare motion line ("a head turning") makes the model guess at all of
+ * it, and image-to-video models guess towards stock footage.
+ */
+function clipPrompt(opts: {
+  style: string;
+  subjects: string;
+  visual: string;
+  framing: string | null;
+  motion: string | null;
+  liveAction: boolean;
+  audio: boolean;
+}) {
+  const camera = opts.liveAction
+    ? "Cinematic film still in motion, anamorphic lens, natural motion blur, realistic skin texture and micro-expressions, physically accurate light, 24fps film look, subtle handheld camera"
+    : "Cinematic camera, smooth motion, consistent lighting";
+  return [
+    opts.style,
+    opts.subjects,
+    `Scene: ${opts.visual}`,
+    opts.framing ? `${opts.framing} shot` : "",
+    opts.motion ? `Action: ${opts.motion}` : "Action: subtle natural movement, the frame stays alive",
+    camera,
+    "Keep faces, wardrobe and setting exactly as in the start frame",
+    opts.audio ? "Audio: ambient sound and foley only, nobody speaks" : "",
+  ]
+    .map((x) => String(x ?? "").trim())
+    .filter(Boolean)
+    .join(". ");
+}
+
+const NEGATIVE_BASE =
+  "text, watermark, subtitles, logo, distorted face, morphing face, extra fingers, extra limbs, warped hands, flicker, low quality";
+// Only for live action: an anime show must not be told to avoid cartoons.
+const NEGATIVE_LIVE = `${NEGATIVE_BASE}, cartoon, illustration, CGI, 3D render, plastic skin, waxy skin, oversaturated`;
 
 fal.config({ credentials: process.env.FAL_KEY! });
 
@@ -42,7 +81,41 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
     }
   }
 
-  const { endpoint, duration, usd } = clipEndpoint(model, Number(shot.target_seconds));
+  const { endpoint, duration, durationValue, usd } = clipEndpoint(model, Number(shot.target_seconds));
+  const spec = CLIP_MODELS[model];
+
+  const { data: episode } = await db
+    .from("episodes").select("series_id").eq("id", shot.episode_id).single();
+  const { data: series } = episode
+    ? await db.from("series").select("render_style, aspect_ratio").eq("id", episode.series_id).single()
+    : { data: null };
+  const { data: refs } = await db
+    .from("refs").select("name, description").in("id", shot.ref_ids ?? []);
+
+  const liveAction = series?.render_style === "live_action";
+  const aspect = series?.aspect_ratio === "9:16" ? "9:16" : "16:9";
+  const hasAudio = spec.durationKind === "veo" || spec.durationKind === "seedance" || spec.durationKind === "kling3";
+
+  const prompt = clipPrompt({
+    style: styleFragment(series?.render_style ?? "live_action"),
+    subjects: (refs ?? []).map((r) => `${r.name}: ${r.description ?? ""}`).join("; "),
+    visual: shot.visual,
+    framing: shot.framing,
+    motion: shot.motion,
+    liveAction,
+    audio: hasAudio,
+  });
+
+  // Provider-specific quality switches. Veo and Seedance default to 720p.
+  const extra: Record<string, unknown> = {};
+  if (spec.durationKind === "veo") {
+    extra.resolution = "1080p";
+    extra.aspect_ratio = aspect;
+  }
+  if (spec.durationKind === "seedance") {
+    extra.resolution = "1080p";
+    extra.aspect_ratio = aspect;
+  }
 
   await db
     .from("shots")
@@ -57,17 +130,13 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
   try {
     const { request_id } = await fal.queue.submit(endpoint, {
       input: {
-        prompt: shot.motion || shot.visual,
-        // Kling v3 calls it start_image_url; most others image_url. A wrong
-        // field name fails the same way a wrong endpoint does.
-        [CLIP_MODELS[model].imageField]: startFrame,
-        // Kling accepts only "5" or "10" as strings; Wan accepts any whole
-        // number from 2 to 10. Send what the model asked for.
-        duration:
-          (CLIP_MODELS[model] as any).durationKind === "seconds"
-            ? Math.max(2, Math.min(10, Math.round(Number(shot.target_seconds))))
-            : String(duration),
-        negative_prompt: "text, watermark, subtitles, distorted face, extra limbs",
+        prompt,
+        // Kling v3 calls it start_image_url; most others image_url.
+        [spec.imageField]: startFrame,
+        duration: durationValue,
+        // Seedance has no negative prompt field; the others honour it.
+        ...(spec.durationKind === "seedance" ? {} : { negative_prompt: liveAction ? NEGATIVE_LIVE : NEGATIVE_BASE }),
+        ...extra,
       },
       webhookUrl: `${process.env.APP_URL}/api/webhooks/fal-shot?shot=${shotId}&kind=clip`,
     });

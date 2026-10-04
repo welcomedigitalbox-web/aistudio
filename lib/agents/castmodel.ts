@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createServiceClient } from "@/lib/supabase/server";
-import { CLIP_MODELS } from "@/lib/production/models";
+import { CLIP_MODELS, clipEndpoint } from "@/lib/production/models";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 const MODEL = "claude-sonnet-4-6";
@@ -132,9 +132,8 @@ ${catalogue}`,
     .eq("episode_id", episodeId);
 
   const estimate = (after ?? []).reduce((t, s: any) => {
-    const spec = (CLIP_MODELS as any)[s.suggested_model];
-    if (!spec) return t;
-    return t + spec.usdPer5s * (Number(s.target_seconds) > 7 ? 2 : 1);
+    if (!(s.suggested_model in CLIP_MODELS)) return t;
+    return t + clipEndpoint(s.suggested_model, Number(s.target_seconds)).usd;
   }, 0);
 
   return {

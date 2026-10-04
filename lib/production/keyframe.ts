@@ -68,6 +68,9 @@ export async function generateKeyframe(
     subjects,
     shot.visual,
     shot.framing ? `${shot.framing} shot` : "",
+    series.render_style === "live_action"
+      ? "shot on ARRI Alexa, 35mm anamorphic lens, motivated practical lighting, realistic skin pores and texture, film colour grade"
+      : "",
     "no text, no watermark, no subtitles",
   ]
     .map((s) => String(s ?? "").trim())
@@ -85,12 +88,30 @@ export async function generateKeyframe(
     .eq("id", shotId);
 
   const input: Record<string, unknown> = { prompt, num_images: 1 };
+  const portrait = series.aspect_ratio === "9:16";
+  const ratio = portrait ? "9:16" : "16:9";
 
-  // An edit endpoint derives its size from the image it is given; passing one
-  // is rejected.
-  if (!spec.refs) {
-    input.image_size =
-      series.aspect_ratio === "9:16" ? "portrait_16_9" : "landscape_16_9";
+  /**
+   * Size the still for the clip it will become. Video models want 720p or
+   * better at 16:9 or 9:16; anything else is cropped or upscaled into mush.
+   * Each provider names the setting differently:
+   *  - Seedream edit defaults to 512x512 if not told otherwise.
+   *  - Nano Banana defaults to the reference image's shape (a square sheet).
+   *  - Flux Ultra ignores image_size; it reads aspect_ratio.
+   */
+  if (spec.id.includes("seedream")) {
+    input.image_size = portrait ? { width: 1440, height: 2560 } : { width: 2560, height: 1440 };
+  } else if (spec.id.includes("nano-banana")) {
+    input.aspect_ratio = ratio;
+    if (spec.id.includes("pro")) input.resolution = "2K";
+  } else if (spec.id.includes("flux-pro/v1.1-ultra")) {
+    input.aspect_ratio = ratio;
+    // raw mode drops the glossy AI look — the single biggest win for live action.
+    if (series.render_style === "live_action") input.raw = true;
+  } else if (spec.id.startsWith("xai/")) {
+    input.aspect_ratio = ratio;
+  } else {
+    input.image_size = portrait ? "portrait_16_9" : "landscape_16_9";
   }
 
   if (spec.refs && refUrls.length > 0) {

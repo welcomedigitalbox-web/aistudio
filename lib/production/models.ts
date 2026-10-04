@@ -63,6 +63,15 @@ export const KEYFRAME_MODELS = {
     refs: true,
     maxRefs: 4,
   },
+
+  /** Best face consistency from reference art. Use for hero shots of the cast. */
+  nano_pro: {
+    id: "fal-ai/nano-banana-pro/edit",
+    label: "Nano Banana Pro — best character consistency, $0.15",
+    usd: 0.15,
+    refs: true,
+    maxRefs: 6,
+  },
 } as const;
 
 export type KeyframeModel = keyof typeof KEYFRAME_MODELS;
@@ -93,7 +102,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v3/standard/image-to-video",
     usdPer5s: 0.56,
     imageField: "start_image_url",
-    durationKind: "kling" as const,
+    durationKind: "kling3" as const,
   },
 
   kling3: {
@@ -102,7 +111,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v3/pro/image-to-video",
     usdPer5s: 0.84,
     imageField: "start_image_url",
-    durationKind: "kling" as const,
+    durationKind: "kling3" as const,
   },
 
   /**
@@ -115,7 +124,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/v3/4k/image-to-video",
     usdPer5s: 2.1,
     imageField: "start_image_url",
-    durationKind: "kling" as const,
+    durationKind: "kling3" as const,
   },
 
   /** Start and end frame, animating the transition between them. */
@@ -125,7 +134,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/kling-video/o3/pro/image-to-video",
     usdPer5s: 1.0,
     imageField: "start_image_url",
-    durationKind: "kling" as const,
+    durationKind: "kling3" as const,
   },
 
   /** Note the missing fal-ai prefix — this is how fal lists it. */
@@ -135,7 +144,7 @@ export const CLIP_MODELS = {
     std: "bytedance/seedance-2.0/image-to-video",
     usdPer5s: 3.41,
     imageField: "image_url",
-    durationKind: "kling" as const,
+    durationKind: "seedance" as const,
   },
 
   seedance2_mini: {
@@ -144,7 +153,7 @@ export const CLIP_MODELS = {
     std: "bytedance/seedance-2.0-mini/image-to-video",
     usdPer5s: 1.2,
     imageField: "image_url",
-    durationKind: "kling" as const,
+    durationKind: "seedance" as const,
   },
 
   veo_fast_fal: {
@@ -153,7 +162,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/veo3.1/fast/image-to-video",
     usdPer5s: 0.75,
     imageField: "image_url",
-    durationKind: "kling" as const,
+    durationKind: "veo" as const,
   },
 
   veo_full: {
@@ -162,7 +171,7 @@ export const CLIP_MODELS = {
     std: "fal-ai/veo3.1/image-to-video",
     usdPer5s: 1.0,
     imageField: "image_url",
-    durationKind: "kling" as const,
+    durationKind: "veo" as const,
   },
 
   wan27: {
@@ -177,17 +186,55 @@ export const CLIP_MODELS = {
 
 export type ClipModel = keyof typeof CLIP_MODELS;
 
-/** Kling accepts 5 or 10 seconds, nothing between. Round to the nearer. */
+/** Kling 1.6 / 2.5 accept 5 or 10 seconds, nothing between. Round to the nearer. */
 export function klingDuration(seconds: number): 5 | 10 {
   return seconds > 7 ? 10 : 5;
 }
 
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(n)));
+
+/**
+ * Every provider spells duration differently, and a wrong spelling is either
+ * rejected or silently replaced with the default. Veo wants "4s" | "6s" | "8s";
+ * Kling 3 takes "3".."15"; Seedance "4".."15"; Wan a number 2..10.
+ */
+export function clipDuration(model: ClipModel, seconds: number): { seconds: number; value: string | number } {
+  const kind = CLIP_MODELS[model].durationKind;
+  switch (kind) {
+    case "veo": {
+      const s = seconds <= 5 ? 4 : seconds <= 7 ? 6 : 8;
+      return { seconds: s, value: `${s}s` };
+    }
+    case "kling3": {
+      const s = clamp(seconds, 3, 15);
+      return { seconds: s, value: String(s) };
+    }
+    case "seedance": {
+      const s = clamp(seconds, 4, 15);
+      return { seconds: s, value: String(s) };
+    }
+    case "seconds": {
+      const s = clamp(seconds, 2, 10);
+      return { seconds: s, value: s };
+    }
+    default: {
+      const s = klingDuration(seconds);
+      return { seconds: s, value: String(s) };
+    }
+  }
+}
+
+/**
+ * Always the pro endpoint. The old rule sent every shot over 7 seconds to the
+ * standard tier, which is why long held shots looked worse than short ones.
+ */
 export function clipEndpoint(model: ClipModel, seconds: number) {
   const spec = CLIP_MODELS[model];
-  const duration = klingDuration(seconds);
+  const d = clipDuration(model, seconds);
   return {
-    endpoint: duration > 5 ? spec.std : spec.pro,
-    duration,
-    usd: spec.usdPer5s * (duration / 5),
+    endpoint: spec.pro,
+    duration: d.seconds,
+    durationValue: d.value,
+    usd: spec.usdPer5s * (d.seconds / 5),
   };
 }

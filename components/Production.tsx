@@ -36,6 +36,7 @@ const KEYFRAME_MODELS = [
   { id: "draft", label: "Flux Schnell — draft, $0.003" },
   { id: "seedream", label: "Seedream — uses reference art, $0.03" },
   { id: "nano", label: "Nano Banana — uses reference art, $0.04" },
+  { id: "nano_pro", label: "Nano Banana Pro — best faces, $0.15" },
   { id: "grok_text", label: "Grok Imagine 2.0 — text only, $0.04" },
   { id: "grok_image", label: "Grok Imagine 2.0 — uses reference art, $0.05" },
   { id: "ultra", label: "Flux Pro Ultra — photoreal, $0.06" },
