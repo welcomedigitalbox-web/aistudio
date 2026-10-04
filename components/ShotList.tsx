@@ -52,6 +52,9 @@ export function ShotList({
   const [seconds, setSeconds] = useState(6);
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
+  // Per-scene direction for the next build: exact shot count, lengths, lines.
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
 
   const byScene = new Map<string, Shot[]>();
   for (const s of shots) {
@@ -84,7 +87,8 @@ export function ShotList({
   async function build(sceneId: string) {
     setBusy(sceneId);
     setError("");
-    const json = await call({ action: "build", sceneId });
+    const note = notes[sceneId]?.trim();
+    const json = await call({ action: "build", sceneId, ...(note ? { note } : {}) });
     setBusy(null);
     if (!json) return false;
     if (json.unknownRefs?.length) {
@@ -187,16 +191,42 @@ export function ShotList({
                 <div style={{ fontSize: 13 }}>{sc.slug}</div>
               </div>
               {!locked && (
-                <button
-                  className="ghost"
-                  onClick={() => build(sc.id)}
-                  disabled={busy !== null || runningAll}
-                  style={{ fontSize: 12, padding: "3px 10px" }}
-                >
-                  {busy === sc.id ? "…" : list.length ? "Rebuild" : "Build"}
-                </button>
+                <div className="row" style={{ gap: 6 }}>
+                  <button
+                    className="ghost"
+                    onClick={() => setNoteOpen(noteOpen === sc.id ? null : sc.id)}
+                    disabled={busy !== null || runningAll}
+                    style={{ fontSize: 12, padding: "3px 10px" }}
+                  >
+                    {notes[sc.id]?.trim() ? "Note ✓" : "Note"}
+                  </button>
+                  <button
+                    className="ghost"
+                    onClick={async () => {
+                      const ok = await build(sc.id);
+                      if (ok) setNoteOpen(null);
+                    }}
+                    disabled={busy !== null || runningAll}
+                    style={{ fontSize: 12, padding: "3px 10px" }}
+                  >
+                    {busy === sc.id ? "…" : list.length ? "Rebuild" : "Build"}
+                  </button>
+                </div>
               )}
             </div>
+
+            {!locked && noteOpen === sc.id && (
+              <div style={{ display: "grid", gap: 4 }}>
+                <textarea
+                  value={notes[sc.id] ?? ""}
+                  onChange={(e) => setNotes((n) => ({ ...n, [sc.id]: e.target.value }))}
+                  rows={8}
+                  placeholder="Direction for this build — shot count, lengths, framing, exact lines. Rebuilding replaces this scene's shots."
+                  style={{ fontSize: 13, fontFamily: "inherit" }}
+                />
+                <span className="note">Sent with the next Build / Rebuild of this scene only.</span>
+              </div>
+            )}
 
             {list.length === 0 && (
               <div className="empty" style={{ padding: 16, fontSize: 13 }}>

@@ -66,8 +66,8 @@ export function Production({
   shots: Shot[];
 }) {
   const router = useRouter();
-  const [kfModel, setKfModel] = useState("flux");
-  const [clipModel, setClipModel] = useState("kling_v1");
+  const [kfModel, setKfModel] = useState("nano_pro");
+  const [clipModel, setClipModel] = useState("kling3");
   const [busy, setBusy] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
@@ -211,8 +211,7 @@ export function Production({
       <div className="card" style={{ display: "grid", gap: 10 }}>
         <strong>2 · Clips</strong>
         <div className="note">
-          Image-to-video from the approved keyframe. Shots over 7 seconds switch to
-          Kling's standard mode automatically — professional mode caps at 5.
+          Image-to-video from the approved keyframe. Every shot uses the model's professional tier, at the length the shot asks for.
         </div>
         {needApproval.length > 0 && (
           <div className="note" style={{ color: "var(--amber)" }}>
