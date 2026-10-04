@@ -111,7 +111,38 @@ export async function POST(req: Request) {
    * profile is the same man as the front rather than his cousin.
    */
   let anchorUrl: string | null = null;
-  if (spec.edit && ref.kind === "character") {
+
+  /**
+   * Phases of one person ("Nga Tet Pya (Thief Phase)", "Nga Tet Pya
+   * (Commander Phase)") share a name before the bracket. A later phase takes
+   * its face from the earliest phase's chosen art and only its clothes from
+   * its own description; otherwise "same man as before" means nothing to the
+   * model and the commander comes out as a stranger.
+   */
+  let faceOnly = false;
+  if (spec.edit && ref.kind === "character" && ref.name.includes(" (")) {
+    const baseName = ref.name.split(" (")[0].trim();
+    const { data: siblings } = await db
+      .from("refs")
+      .select("id, name, chosen_image_id, created_at")
+      .eq("series_id", ref.series_id)
+      .eq("kind", "character")
+      .order("created_at", { ascending: true });
+    const family = (siblings ?? []).filter(
+      (r) => r.name.split(" (")[0].trim() === baseName && r.chosen_image_id
+    );
+    const first = family[0];
+    if (first && first.id !== refId) {
+      const { data: img } = await db
+        .from("ref_images").select("storage_key").eq("id", first.chosen_image_id).maybeSingle();
+      if (img?.storage_key) {
+        anchorUrl = `${base}/${img.storage_key}`;
+        faceOnly = true;
+      }
+    }
+  }
+
+  if (!anchorUrl && spec.edit && ref.kind === "character") {
     const { data: anchor } = ref.chosen_image_id
       ? await db.from("ref_images").select("storage_key").eq("id", ref.chosen_image_id).maybeSingle()
       : await db
@@ -127,13 +158,16 @@ export async function POST(req: Request) {
   }
 
   async function queueAngle(angle: (typeof angles)[number], waitForResult: boolean) {
-    const useEdit = Boolean(spec.edit && anchorUrl && angle.id !== "front");
+    // A face borrowed from another phase applies to every angle, front included.
+    const useEdit = Boolean(spec.edit && anchorUrl && (faceOnly || angle.id !== "front"));
     const prompt = buildRefPrompt({
       styleFragment: styleRef?.description ?? "",
       name: ref!.name,
-      description: useEdit
-        ? `the exact same person as in the reference image, identical face, hairstyle, skin tone and outfit. ${ref!.description}`
-        : ref!.description!,
+      description: !useEdit
+        ? ref!.description!
+        : faceOnly
+          ? `the exact same person as in the reference image: identical face, bone structure, age, skin tone, tattoos and hairline. Change only the clothing and accessories to the following, ignore the clothing in the reference image: ${ref!.description}`
+          : `the exact same person as in the reference image, identical face, hairstyle, skin tone and outfit. ${ref!.description}`,
       angleFragment: angle.fragment,
       kind: ref!.kind,
     });
