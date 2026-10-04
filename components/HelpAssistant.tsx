@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "assistant"; content: string };
+type Thread = { threadId: string; title: string; updatedAt: string };
 
 /**
  * A help desk that lives on every page. It quietly records the errors the app
@@ -83,6 +84,10 @@ export function HelpAssistant() {
   const [busy, setBusy] = useState(false);
   const [unseen, setUnseen] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,6 +101,37 @@ export function HelpAssistant() {
       listeners.delete(onError);
     };
   }, []);
+
+  // History lives in the database: open the panel where the person left off.
+  async function load(thread?: string) {
+    try {
+      const res = await fetch(`/api/help${thread ? `?thread=${thread}` : ""}`);
+      const json = await res.json();
+      setThreads(json.threads ?? []);
+      setThreadId(json.threadId ?? null);
+      setMessages(json.messages ?? []);
+    } catch {
+      /* history is a convenience; the chat still works without it */
+    }
+    setLoaded(true);
+  }
+
+  useEffect(() => {
+    if (open && !loaded) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function newChat() {
+    setThreadId(null);
+    setMessages([]);
+    setShowHistory(false);
+  }
+
+  async function removeThread(id: string) {
+    await fetch(`/api/help?thread=${id}`, { method: "DELETE" }).catch(() => null);
+    setThreads((t) => t.filter((x) => x.threadId !== id));
+    if (id === threadId) newChat();
+  }
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
@@ -113,6 +149,8 @@ export function HelpAssistant() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          threadId,
+          question: q,
           messages: next,
           context: {
             path: window.location.pathname,
@@ -123,6 +161,15 @@ export function HelpAssistant() {
       });
       const json = await res.json().catch(() => ({}));
       setMessages([...next, { role: "assistant", content: json.reply ?? json.error ?? "No answer came back." }]);
+      if (json.threadId) {
+        const isNew = json.threadId !== threadId;
+        setThreadId(json.threadId);
+        setThreads((t) => {
+          const rest = t.filter((x) => x.threadId !== json.threadId);
+          const title = isNew ? q.slice(0, 80) : t.find((x) => x.threadId === json.threadId)?.title ?? q.slice(0, 80);
+          return [{ threadId: json.threadId, title, updatedAt: new Date().toISOString() }, ...rest];
+        });
+      }
     } catch (e) {
       setMessages([...next, { role: "assistant", content: `Could not reach the help assistant: ${(e as Error).message}` }]);
     }
@@ -166,12 +213,58 @@ export function HelpAssistant() {
         >
           <div className="row between">
             <strong>Help</strong>
-            <button className="ghost" onClick={() => setOpen(false)} style={{ fontSize: 12, padding: "2px 8px" }}>
-              Close
-            </button>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="ghost" onClick={() => setShowHistory((h) => !h)} style={{ fontSize: 12, padding: "2px 8px" }}>
+                {showHistory ? "Back" : `History${threads.length ? ` (${threads.length})` : ""}`}
+              </button>
+              <button className="ghost" onClick={newChat} disabled={busy} style={{ fontSize: 12, padding: "2px 8px" }}>
+                New chat
+              </button>
+              <button className="ghost" onClick={() => setOpen(false)} style={{ fontSize: 12, padding: "2px 8px" }}>
+                Close
+              </button>
+            </div>
           </div>
 
-          {lastError && (
+          {showHistory && (
+            <div style={{ flex: 1, overflowY: "auto", display: "grid", gap: 4, alignContent: "start" }}>
+              {threads.length === 0 && <p className="note" style={{ margin: 0 }}>No past chats yet.</p>}
+              {threads.map((t) => (
+                <div
+                  key={t.threadId}
+                  className="row between"
+                  style={{
+                    gap: 6, padding: "6px 8px", borderRadius: 6, cursor: "pointer",
+                    background: t.threadId === threadId ? "rgba(0,0,0,.06)" : "transparent",
+                  }}
+                  onClick={() => {
+                    setShowHistory(false);
+                    load(t.threadId);
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {t.title || "(untitled)"}
+                    </div>
+                    <div className="note" style={{ fontSize: 11 }}>{new Date(t.updatedAt).toLocaleString()}</div>
+                  </div>
+                  <button
+                    className="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm("Delete this chat?")) removeThread(t.threadId);
+                    }}
+                    style={{ fontSize: 11, padding: "1px 6px" }}
+                    aria-label="Delete chat"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!showHistory && lastError && (
             <div className="err" style={{ fontSize: 12, display: "grid", gap: 6 }}>
               <span style={{ wordBreak: "break-word" }}>{lastError}</span>
               <button
@@ -184,7 +277,7 @@ export function HelpAssistant() {
             </div>
           )}
 
-          <div ref={scroller} style={{ flex: 1, overflowY: "auto", display: "grid", gap: 8, alignContent: "start" }}>
+          <div ref={scroller} style={{ flex: 1, overflowY: "auto", display: showHistory ? "none" : "grid", gap: 8, alignContent: "start" }}>
             {messages.length === 0 && (
               <p className="note" style={{ margin: 0 }}>
                 Ask anything about this page — what a button does, why something failed, what to do next. It sees the page you are on and any error the app just raised. မြန်မာလိုလည်း မေးလို့ရပါတယ်။
@@ -212,7 +305,7 @@ export function HelpAssistant() {
               e.preventDefault();
               ask(draft);
             }}
-            style={{ display: "flex", gap: 6 }}
+            style={{ display: showHistory ? "none" : "flex", gap: 6 }}
           >
             <textarea
               value={draft}

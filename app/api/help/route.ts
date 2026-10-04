@@ -52,32 +52,110 @@ HOW TO ANSWER
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * History. GET with ?thread= returns that conversation; without, it returns
+ * the person's recent threads and the newest one's messages, so the panel
+ * opens where they left off on any device.
+ */
+export async function GET(req: Request) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const thread = new URL(req.url).searchParams.get("thread");
+
+  const { data: recent, error } = await supabase
+    .from("help_messages")
+    .select("thread_id, role, content, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(400);
+  if (error) return NextResponse.json({ threads: [], messages: [], threadId: null, unavailable: error.message });
+
+  // Collapse to one row per thread: its first question and its latest time.
+  const byThread = new Map<string, { threadId: string; title: string; updatedAt: string }>();
+  for (const m of [...(recent ?? [])].reverse()) {
+    const t = byThread.get(m.thread_id);
+    if (!t) byThread.set(m.thread_id, { threadId: m.thread_id, title: m.role === "user" ? m.content.slice(0, 80) : "", updatedAt: m.created_at });
+    else {
+      t.updatedAt = m.created_at;
+      if (!t.title && m.role === "user") t.title = m.content.slice(0, 80);
+    }
+  }
+  const threads = [...byThread.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 30);
+
+  const open = thread && UUID.test(thread) ? thread : threads[0]?.threadId ?? null;
+  let messages: Msg[] = [];
+  if (open) {
+    const { data } = await supabase
+      .from("help_messages")
+      .select("role, content")
+      .eq("user_id", user.id)
+      .eq("thread_id", open)
+      .order("created_at", { ascending: true })
+      .limit(200);
+    messages = (data ?? []) as Msg[];
+  }
+
+  return NextResponse.json({ threads, threadId: open, messages });
+}
+
+export async function DELETE(req: Request) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const thread = new URL(req.url).searchParams.get("thread");
+  if (!thread || !UUID.test(thread)) return NextResponse.json({ error: "thread is required." }, { status: 400 });
+
+  const { error } = await supabase.from("help_messages").delete().eq("user_id", user.id).eq("thread_id", thread);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: Request) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const messages: Msg[] = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
-  if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
-    return NextResponse.json({ error: "Ask a question." }, { status: 400 });
-  }
+  const question = String(body.question ?? "").trim().slice(0, 4000);
+  if (!question) return NextResponse.json({ error: "Ask a question." }, { status: 400 });
+  const threadId: string = UUID.test(String(body.threadId ?? "")) ? body.threadId : crypto.randomUUID();
+
+  // History comes from the database, so it survives reloads and devices. If
+  // the table is not there yet, fall back to what the panel sent.
+  let history: Msg[] = [];
+  const { data: past, error: pastError } = await supabase
+    .from("help_messages")
+    .select("role, content")
+    .eq("user_id", user.id)
+    .eq("thread_id", threadId)
+    .order("created_at", { ascending: false })
+    .limit(12);
+  if (!pastError) history = ((past ?? []) as Msg[]).reverse();
+  else if (Array.isArray(body.messages)) history = (body.messages as Msg[]).slice(-12);
 
   const ctx = body.context ?? {};
   const errors: string[] = Array.isArray(ctx.errors) ? ctx.errors.slice(-8) : [];
+  const path = String(ctx.path ?? "").slice(0, 200);
   const context = [
-    `Page: ${String(ctx.path ?? "").slice(0, 200)}`,
+    `Page: ${path}`,
     errors.length ? `Recent errors raised by the app (newest last):\n${errors.map((e) => `- ${String(e).slice(0, 400)}`).join("\n")}` : "Recent errors: none captured.",
     `What is on the screen (truncated):\n${String(ctx.page ?? "").slice(0, 6000)}`,
   ].join("\n\n");
 
   // The context rides on the latest question only, so the history stays small.
-  const last = messages[messages.length - 1];
   const sent: Msg[] = [
-    ...messages.slice(0, -1).map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) })),
-    { role: "user", content: `<context>\n${context}\n</context>\n\n${String(last.content).slice(0, 4000)}` },
+    ...history.map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) })),
+    { role: "user", content: `<context>\n${context}\n</context>\n\n${question}` },
   ];
+  // The API wants the conversation to open on a user turn.
+  while (sent.length && sent[0].role !== "user") sent.shift();
 
+  let reply: string;
   try {
     const msg = await client.messages.create({
       model: MODEL,
@@ -85,9 +163,15 @@ export async function POST(req: Request) {
       system: GUIDE,
       messages: sent,
     });
-    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    return NextResponse.json({ reply: text || "No answer came back. Try again." });
+    reply = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim() || "No answer came back. Try again.";
   } catch (e) {
-    return NextResponse.json({ error: `The help assistant could not answer: ${(e as Error).message}` }, { status: 502 });
+    return NextResponse.json({ error: `The help assistant could not answer: ${(e as Error).message}`, threadId }, { status: 502 });
   }
+
+  const { error: saveError } = await supabase.from("help_messages").insert([
+    { user_id: user.id, thread_id: threadId, role: "user", content: question, path },
+    { user_id: user.id, thread_id: threadId, role: "assistant", content: reply, path },
+  ]);
+
+  return NextResponse.json({ reply, threadId, saved: !saveError });
 }
