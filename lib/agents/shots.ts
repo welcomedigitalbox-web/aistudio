@@ -208,6 +208,23 @@ ${note ? `\nNote for this pass:\n${note}` : ""}`,
     n++;
   }
 
+  // Rebuilding one scene appends its shots after the episode's highest number,
+  // so a rebuilt scene 1 would sort after scene 2. Renumber the whole episode
+  // in scene order. Two passes so the unique (episode_id, n) never collides.
+  const { data: all } = await db
+    .from("shots")
+    .select("id, scene_n, n")
+    .eq("episode_id", scene.episode_id);
+  const ordered = (all ?? []).sort(
+    (a, b) => (a.scene_n ?? 0) - (b.scene_n ?? 0) || a.n - b.n
+  );
+  for (let i = 0; i < ordered.length; i++) {
+    await db.from("shots").update({ n: 100000 + i }).eq("id", ordered[i].id);
+  }
+  for (let i = 0; i < ordered.length; i++) {
+    await db.from("shots").update({ n: i + 1 }).eq("id", ordered[i].id);
+  }
+
   // The scene's share of the planning cost.
   await db
     .from("scenes")
