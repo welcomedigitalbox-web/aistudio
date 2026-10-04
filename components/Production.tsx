@@ -34,7 +34,6 @@ interface Scene {
 
 const KEYFRAME_MODELS = [
   { id: "draft", label: "Flux Schnell — draft, $0.003" },
-  { id: "flux", label: "Flux Dev — no references, $0.025" },
   { id: "seedream", label: "Seedream — uses reference art, $0.03" },
   { id: "nano", label: "Nano Banana — uses reference art, $0.04" },
   { id: "grok_text", label: "Grok Imagine 2.0 — text only, $0.04" },
