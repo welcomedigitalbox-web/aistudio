@@ -35,6 +35,7 @@ export const KEYFRAME_MODELS = {
 
   seedream: {
     id: "fal-ai/bytedance/seedream/v4/edit",
+    text: "fal-ai/bytedance/seedream/v4/text-to-image",
     label: "Seedream — uses reference art, $0.03",
     usd: 0.03,
     refs: true,
@@ -42,6 +43,7 @@ export const KEYFRAME_MODELS = {
   },
   grok_image: {
     id: "xai/grok-imagine-image/v2.0/edit",
+    text: "xai/grok-imagine-image/v2.0/text-to-image",
     label: "Grok Imagine 2.0 — uses reference art, $0.05",
     usd: 0.05,
     refs: true,
@@ -58,6 +60,7 @@ export const KEYFRAME_MODELS = {
 
   nano: {
     id: "fal-ai/nano-banana/edit",
+    text: "fal-ai/nano-banana",
     label: "Nano Banana — uses reference art, $0.04",
     usd: 0.04,
     refs: true,
@@ -67,6 +70,7 @@ export const KEYFRAME_MODELS = {
   /** Best face consistency from reference art. Use for hero shots of the cast. */
   nano_pro: {
     id: "fal-ai/nano-banana-pro/edit",
+    text: "fal-ai/nano-banana-pro",
     label: "Nano Banana Pro — best character consistency, $0.15",
     usd: 0.15,
     refs: true,

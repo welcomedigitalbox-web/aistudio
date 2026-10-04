@@ -77,15 +77,25 @@ export async function generateKeyframe(
     .filter(Boolean)
     .join(", ");
 
+  /**
+   * A reference model on a shot with no reference art (an empty landscape, a
+   * title plate, a location whose art was never chosen) falls back to the
+   * same model's text-to-image twin, so one model can run the whole episode.
+   */
+  const textTwin = (spec as { text?: string }).text;
+  const useText = spec.refs && refUrls.length === 0 && Boolean(textTwin);
+  const endpoint = useText ? textTwin! : spec.id;
+
   await db
     .from("shots")
     .update({
       keyframe_state: "running",
-      keyframe_model: spec.id,
+      keyframe_model: endpoint,
       keyframe_error: null,
       created_by: shot.created_by ?? userId,
     })
     .eq("id", shotId);
+
 
   const input: Record<string, unknown> = { prompt, num_images: 1 };
   const portrait = series.aspect_ratio === "9:16";
@@ -99,16 +109,16 @@ export async function generateKeyframe(
    *  - Nano Banana defaults to the reference image's shape (a square sheet).
    *  - Flux Ultra ignores image_size; it reads aspect_ratio.
    */
-  if (spec.id.includes("seedream")) {
+  if (endpoint.includes("seedream")) {
     input.image_size = portrait ? { width: 1440, height: 2560 } : { width: 2560, height: 1440 };
-  } else if (spec.id.includes("nano-banana")) {
+  } else if (endpoint.includes("nano-banana")) {
     input.aspect_ratio = ratio;
-    if (spec.id.includes("pro")) input.resolution = "2K";
-  } else if (spec.id.includes("flux-pro/v1.1-ultra")) {
+    if (endpoint.includes("pro")) input.resolution = "2K";
+  } else if (endpoint.includes("flux-pro/v1.1-ultra")) {
     input.aspect_ratio = ratio;
     // raw mode drops the glossy AI look — the single biggest win for live action.
     if (series.render_style === "live_action") input.raw = true;
-  } else if (spec.id.startsWith("xai/")) {
+  } else if (endpoint.startsWith("xai/")) {
     input.aspect_ratio = ratio;
   } else {
     input.image_size = portrait ? "portrait_16_9" : "landscape_16_9";
@@ -118,7 +128,7 @@ export async function generateKeyframe(
     input.image_urls = refUrls.slice(0, spec.maxRefs ?? 4);
   }
 
-  if (spec.refs && refUrls.length === 0) {
+  if (spec.refs && refUrls.length === 0 && !useText) {
     await db
       .from("shots")
       .update({
@@ -136,7 +146,7 @@ export async function generateKeyframe(
   const warning = null;
 
   try {
-    const { request_id } = await fal.queue.submit(spec.id, {
+    const { request_id } = await fal.queue.submit(endpoint, {
       input,
       webhookUrl: `${process.env.APP_URL}/api/webhooks/fal-shot?shot=${shotId}&kind=keyframe`,
     });
