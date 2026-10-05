@@ -70,7 +70,10 @@ export async function POST(req: Request) {
 
   try {
     const ext = kind === "keyframe" ? "png" : "mp4";
-    const key = `shots/${shot.episode_id}/${shotId}-${kind}.${ext}`;
+    // A new name for every result. Reusing one name meant the public CDN and
+    // the browser kept serving the first picture, so a redo was paid for and
+    // never seen.
+    const key = `shots/${shot.episode_id}/${shotId}-${kind}-${Date.now()}.${ext}`;
     await putFromUrl(key, mediaUrl, kind === "keyframe" ? "image/png" : "video/mp4");
 
     const patch: Record<string, unknown> = {
@@ -83,7 +86,7 @@ export async function POST(req: Request) {
     // the next shot in the scene can start from it.
     const tail: string | undefined = out.last_frame?.url ?? out.tail_image_url;
     if (kind === "clip" && tail) {
-      const tailKey = `shots/${shot.episode_id}/${shotId}-tail.png`;
+      const tailKey = `shots/${shot.episode_id}/${shotId}-tail-${Date.now()}.png`;
       await putFromUrl(tailKey, tail, "image/png");
       patch.last_frame_storage_key = tailKey;
     }

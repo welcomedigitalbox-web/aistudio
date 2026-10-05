@@ -147,7 +147,7 @@ export async function speakLine(lineId: string, model: VoiceModel, userId: strin
       result?.data?.audio?.url ?? result?.audio?.url ?? result?.data?.audio_url;
     if (!url) throw new Error("No audio in the response.");
 
-    const key = `voice/${shot.episode_id}/${lineId}.mp3`;
+    const key = `voice/${shot.episode_id}/${lineId}-${Date.now()}.mp3`;
     await putFromUrl(key, url, "audio/mpeg");
 
     // Length matters: the clip has to be at least as long as the line.

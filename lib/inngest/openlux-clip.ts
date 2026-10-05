@@ -116,7 +116,7 @@ export const openluxClip = inngest.createFunction(
       const { data: shot } = await db
         .from("shots").select("episode_id").eq("id", shotId).single();
 
-      const key = `shots/${shot!.episode_id}/${shotId}-clip.mp4`;
+      const key = `shots/${shot!.episode_id}/${shotId}-clip-${Date.now()}.mp4`;
       await putFromUrl(key, url!, "video/mp4");
 
       await db
