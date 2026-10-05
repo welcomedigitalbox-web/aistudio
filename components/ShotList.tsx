@@ -140,6 +140,31 @@ export function ShotList({
     router.refresh();
   }
 
+  /**
+   * Every shot's prompts as one file, in scene order. Work typed into the
+   * shot list should never exist only in the database.
+   */
+  function exportPrompts() {
+    const out: string[] = ["# Shot prompts", ""];
+    for (const sc of scenes) {
+      const list = (byScene.get(String(sc.n)) ?? []).slice().sort((a, b) => a.n - b.n);
+      if (!list.length) continue;
+      out.push(`## Scene ${sc.n} — ${sc.slug ?? ""}`, "");
+      list.forEach((shot, i) => {
+        out.push(`### Scene ${sc.n} · Shot ${i + 1} (#${shot.n} · ${shot.framing ?? "-"} · ${Number(shot.target_seconds)}s)`, "");
+        for (const l of shot.shot_lines ?? []) out.push(`**${l.speaker}:** ${l.line}`, "");
+        out.push("**Keyframe prompt**", "", "```", shot.visual.trim(), "```", "");
+        out.push("**Motion prompt**", "", "```", (shot.motion ?? "").trim(), "```", "");
+      });
+    }
+    const blob = new Blob([out.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `shot-prompts-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   async function toggleOnScreen(line: Line) {
     setBusy(line.id);
     await call({ action: "update-line", lineId: line.id, onScreen: !line.on_screen });
@@ -154,6 +179,12 @@ export function ShotList({
           {shots.length} shots · {approved}/{shots.length} approved ·{" "}
           {Math.round(totalSeconds / 60)}m {Math.round(totalSeconds % 60)}s
         </span>
+        <div className="row" style={{ gap: 6 }}>
+        {shots.length > 0 && (
+          <button className="ghost" onClick={exportPrompts} style={{ fontSize: 12, padding: "3px 10px" }}>
+            Export prompts
+          </button>
+        )}
         {!locked && scenesWithout.length > 0 && (
           <button onClick={buildAll} disabled={runningAll || busy !== null}>
             {runningAll
@@ -161,6 +192,7 @@ export function ShotList({
               : `Build ${scenesWithout.length} scenes`}
           </button>
         )}
+        </div>
       </div>
 
       {onScreenLines > 0 && (

@@ -70,16 +70,37 @@ export async function generateKeyframe(
     .from("series").select("*").eq("id", episode.series_id).single();
   if (!series) throw new Error("Show not found.");
 
-  const { data: refs } = await db
+  /**
+   * Which reference art goes in. The shot's ref list is fixed when the shot
+   * list is built; a visual rewritten by hand afterwards ("U Ohn Maung sits
+   * behind the desk") never added him to it, so the model drew a stranger.
+   * Any cast name written in the visual is added now, and kept on the shot.
+   */
+  const { data: allRefs } = await db
     .from("refs")
     .select("id, kind, name, description, chosen_image_id")
-    .in("id", shot.ref_ids ?? []);
+    .eq("series_id", episode.series_id);
+  const text = cleanVisual(shot.visual).toLowerCase();
+  const mentioned = (allRefs ?? []).filter((r) => {
+    const full = r.name.toLowerCase();
+    const base = full.split(" (")[0].trim();
+    return text.includes(full) || (r.kind === "character" && base.length > 3 && text.includes(base));
+  });
+  const wantedIds = new Set<string>([...(shot.ref_ids ?? []), ...mentioned.map((r) => r.id)]);
+  if (wantedIds.size !== (shot.ref_ids ?? []).length) {
+    await db.from("shots").update({ ref_ids: [...wantedIds] }).eq("id", shotId);
+  }
+  const refs = (allRefs ?? []).filter((r) => wantedIds.has(r.id));
 
-  // Characters first: when a model accepts only a few references, a face
-  // matters more than a wall.
-  const ordered = (refs ?? []).sort((a, b) =>
-    a.kind === "character" ? -1 : b.kind === "character" ? 1 : 0
-  );
+  /**
+   * A location's art shows the whole room, desk and all, and the model copies
+   * it. On a close or an insert — a clock on a wall, hands on a file — that
+   * puts a desk where none belongs, so the place is left to the words.
+   */
+  const tight = ["insert", "close", "close-up", "pov"].includes(String(shot.framing ?? "").toLowerCase());
+  const characters = refs.filter((r) => r.kind === "character");
+  const places = tight ? [] : refs.filter((r) => r.kind !== "character").slice(0, 1);
+  const ordered = [...characters, ...places];
 
   const chosenIds = ordered.map((r) => r.chosen_image_id).filter(Boolean) as string[];
   const { data: images } = chosenIds.length
@@ -89,12 +110,47 @@ export async function generateKeyframe(
   const byId = new Map((images ?? []).map((i) => [i.id, i.storage_key]));
   const base = process.env.R2_PUBLIC_BASE_URL ?? "";
 
-  const refUrls = ordered
-    .map((r) => (r.chosen_image_id ? byId.get(r.chosen_image_id) : null))
-    .filter(Boolean)
-    .map((key) => `${base}/${key}`);
+  const withArt = ordered.filter((r) => r.chosen_image_id && byId.get(r.chosen_image_id));
+  const refUrls = withArt.map((r) => `${base}/${byId.get(r.chosen_image_id!)}`);
 
+  /**
+   * Continuity: the last approved still earlier in this scene. It carries
+   * what words lose between shots — the hat, the costume, the state of the
+   * broken track — so shot 2 is the same day as shot 1.
+   */
+  let continuity = false;
+  if (spec.refs) {
+    const { data: prev } = await db
+      .from("shots")
+      .select("keyframe_storage_key, n")
+      .eq("scene_id", shot.scene_id)
+      .lt("n", shot.n)
+      .eq("keyframe_approved", true)
+      .not("keyframe_storage_key", "is", null)
+      .order("n", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prev?.keyframe_storage_key && refUrls.length < (spec.maxRefs ?? 4)) {
+      refUrls.push(`${base}/${prev.keyframe_storage_key}`);
+      continuity = true;
+    }
+  }
+
+  // Say which image is which; a model given four pictures otherwise guesses.
+  const refGuide = refUrls.length
+    ? [
+        ...withArt.map((r, i) =>
+          r.kind === "character"
+            ? `Reference image ${i + 1} is ${r.name}: copy this exact face, age, hairline and build`
+            : `Reference image ${i + 1} is the location ${r.name}: match its architecture, materials and light`
+        ),
+        continuity
+          ? `Reference image ${withArt.length + 1} is the previous shot of this same scene: keep costumes, props, hats, damage and light consistent with it, but use the camera angle described here, not its framing`
+          : "",
+      ].filter(Boolean).join(". ")
+    : "";
   const subjects = ordered.map((r) => `${r.name}: ${r.description ?? ""}`).join(". ");
+
 
   /**
    * Camera first. Image models weight the start of a prompt most, and the cast
@@ -108,6 +164,7 @@ export async function generateKeyframe(
     storedDirection ? `MOST IMPORTANT — the composition must be: ${storedDirection}` : "",
     !statesFraming && FRAMING[framingWord] ? FRAMING[framingWord] : "",
     visual,
+    refGuide,
     styleFragment(series.render_style),
     subjects ? `Who is who (appearance only): ${subjects}` : "",
     series.render_style === "live_action"
