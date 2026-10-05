@@ -235,6 +235,15 @@ export function ShotList({
                   <button
                     className="ghost"
                     onClick={async () => {
+                      // Rebuilding replaces the scene's shots, and with them
+                      // every still, clip and recorded line already paid for.
+                      const made = list.filter((x) => x.keyframe_storage_key).length;
+                      if (
+                        made > 0 &&
+                        !confirm(
+                          `Rebuilding scene ${sc.n} deletes its ${list.length} shots, including ${made} generated stills and any clips. Continue?`
+                        )
+                      ) return;
                       const ok = await build(sc.id);
                       if (ok) setNoteOpen(null);
                     }}

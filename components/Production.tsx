@@ -79,9 +79,13 @@ export function Production({
 
   const base = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ?? "";
 
-  const needKeyframe = shots.filter((s) => !s.keyframe_storage_key);
+  // A job already rendering is not "needed" again: counting it let a second
+  // press of Generate pay for the same shots twice.
+  const needKeyframe = shots.filter((s) => !s.keyframe_storage_key && s.keyframe_state !== "running");
   const needApproval = shots.filter((s) => s.keyframe_storage_key && !s.keyframe_approved);
-  const needClip = shots.filter((s) => s.keyframe_approved && !s.clip_storage_key);
+  const needClip = shots.filter(
+    (s) => s.keyframe_approved && !s.clip_storage_key && s.clip_state !== "running"
+  );
   const pending = shots.filter(
     (s) => s.keyframe_state === "running" || s.clip_state === "running"
   );

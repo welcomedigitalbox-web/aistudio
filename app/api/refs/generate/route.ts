@@ -194,7 +194,10 @@ export async function POST(req: Request) {
           ...opts,
           onEnqueue: (id: string) => { requestId = id; },
         });
-        await db.from("ref_images").update({ provider_job_id: requestId, state: "running" }).eq("id", row.id);
+        // The webhook has usually stored the picture by now; only mark it
+        // running if it has not, or a finished image disappears from the sheet.
+        await db.from("ref_images").update({ provider_job_id: requestId }).eq("id", row.id);
+        await db.from("ref_images").update({ state: "running" }).eq("id", row.id).eq("state", "queued");
         created.push(row.id);
         // The webhook stores the file; we only need the URL to anchor the rest.
         return (out?.images?.[0]?.url ?? out?.data?.images?.[0]?.url ?? null) as string | null;

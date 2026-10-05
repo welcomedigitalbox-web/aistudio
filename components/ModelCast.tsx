@@ -1,4 +1,6 @@
 "use client";
+
+import { CLIP_MODELS } from "@/lib/production/models";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -17,17 +19,17 @@ interface Shot {
 }
 
 const MODELS = [
-  { id: "kling_v1", label: "Kling 1.6", usd: 0.2 },
-  { id: "wan27", label: "Wan 2.7", usd: 0.3 },
-  { id: "kling_turbo", label: "Kling 2.5 Turbo", usd: 0.35 },
-  { id: "kling3_std", label: "Kling 3.0 Std", usd: 0.56 },
-  { id: "veo_fast_fal", label: "Veo 3.1 Fast", usd: 0.75 },
-  { id: "kling3", label: "Kling 3.0 Pro", usd: 0.84 },
-  { id: "kling_o3", label: "Kling O3 Pro", usd: 1.0 },
-  { id: "veo_full", label: "Veo 3.1", usd: 1.0 },
-  { id: "seedance2_mini", label: "Seedance 2.0 Mini", usd: 1.2 },
-  { id: "kling3_4k", label: "Kling 3.0 4K", usd: 2.1 },
-  { id: "seedance2", label: "Seedance 2.0", usd: 3.41 },
+  { id: "kling_v1", label: "Kling 1.6", usd: CLIP_MODELS.kling_v1.usdPer5s },
+  { id: "wan27", label: "Wan 2.7", usd: CLIP_MODELS.wan27.usdPer5s },
+  { id: "kling_turbo", label: "Kling 2.5 Turbo", usd: CLIP_MODELS.kling_turbo.usdPer5s },
+  { id: "kling3_std", label: "Kling 3.0 Std", usd: CLIP_MODELS.kling3_std.usdPer5s },
+  { id: "veo_fast_fal", label: "Veo 3.1 Fast", usd: CLIP_MODELS.veo_fast_fal.usdPer5s },
+  { id: "kling3", label: "Kling 3.0 Pro", usd: CLIP_MODELS.kling3.usdPer5s },
+  { id: "kling_o3", label: "Kling O3 Pro", usd: CLIP_MODELS.kling_o3.usdPer5s },
+  { id: "veo_full", label: "Veo 3.1", usd: CLIP_MODELS.veo_full.usdPer5s },
+  { id: "seedance2_mini", label: "Seedance 2.0 Mini", usd: CLIP_MODELS.seedance2_mini.usdPer5s },
+  { id: "kling3_4k", label: "Kling 3.0 4K", usd: CLIP_MODELS.kling3_4k.usdPer5s },
+  { id: "seedance2", label: "Seedance 2.0", usd: CLIP_MODELS.seedance2.usdPer5s },
 ];
 
 /**

@@ -23,6 +23,16 @@ Series settings that matter: render style (live action / anime / etc.), aspect r
 Episode page, in order, each locked until the one before is approved:
 1. Scene plan → Approve. 2. Script: each scene written; Read / Edit / Rewrite / Reopen; then Approve the script. 3. Shots: "Build" turns each scene into shots (visual prompt, motion prompt, length, lines). Each scene has a "Note" box: text there is sent with that scene's next Build/Rebuild — use it to set exact shot count, seconds and dialogue. Rebuild replaces that scene's shots. Then Approve the shot list (it has Reopen). 4. Voice: assign a voice to each speaking character, Record, Fit (stretches shots to fit the spoken line). Stock voices do NOT speak Burmese — clone a voice from a 30–60s recording and use the cloned voice. Do voice before clips. Music: one cue per episode. 5. Casting the models: AI picks a clip model per shot; a few cents. 6. Production: Keyframes first (a still per shot; ~$0.15 on Nano Banana Pro), Approve each one you like, then Clips (image-to-video from the approved keyframe). Kling 3.0 Pro ~$0.84/5s for action; Veo 3.1 ~$1/5s for faces and dialogue. "chain shots" starts each clip from the previous clip's last frame within a scene. "Gateway capacity → Check" tests which video models are up, free.
 
+WRITING A KEYFRAME PROMPT (the still)
+- A keyframe is ONE photograph, one frozen moment. Movement ("walks to the desk, then sits") belongs in the motion prompt.
+- First sentence: where the camera stands and faces, and where each person is relative to the set. Example: "Camera in front of the desk facing U Ohn Maung; he stands BEHIND the desk; the papers on the near edge are blurred."
+- "from directly behind him" makes the model shoot his back. Say what we should SEE.
+- Say what should be in frame, not what should not ("Only the clock and the plain wall", rather than "no desk").
+- Leave out tags like [VISUAL], "mute audio", "locked-off" and lists of "strictly no …" — they are noise to an image model.
+- Write the character's name as it appears in the cast; the app attaches their canon art automatically.
+- Use Nano Banana Pro. In a scene, make shot 1, approve it, then shot 2 — the approved still is passed on for continuity.
+- If a still is wrong, press "fix" on it and write the camera position and who stands where; that note leads the prompt for that shot and its clip.
+
 RULES OF THUMB
 - AI image/video models cannot write Burmese text. Title cards and subtitles go in the editor (CapCut / DaVinci), never in a prompt.
 - Reference names in shots must match the cast names exactly, character for character, or the shot gets a stranger.

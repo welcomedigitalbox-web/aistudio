@@ -19,12 +19,19 @@ const STEPS = [
   { id: "approve_script",     label: "Approve the script" },
   { id: "build_shots",        label: "Build the shot list" },
   { id: "approve_shots",      label: "Approve the shots" },
+  { id: "record_voice",       label: "Record the voice" },
   { id: "generate_keyframes", label: "Generate keyframes" },
+  { id: "approve_keyframes",  label: "Approve keyframes" },
   { id: "generate_clips",     label: "Generate clips" },
   { id: "done",               label: "Cut" },
 ] as const;
 
-const order = (id: string) => STEPS.findIndex((s) => s.id === id);
+// A step the page does not know about counts as "past every step it does":
+// returning -1 here once locked the whole episode and showed "Step 1".
+const order = (id: string) => {
+  const i = STEPS.findIndex((s) => s.id === id);
+  return i < 0 ? STEPS.length - 1 : i;
+};
 
 export default async function EpisodePage({
   params,
@@ -64,7 +71,11 @@ export default async function EpisodePage({
   const at = order(step);
   const reached = (id: string) => at >= order(id);
 
-  const spent = (scenes ?? []).reduce((t, s: any) => t + Number(s.cost_usd), 0);
+  // Writing plus what the stills and clips cost; scenes alone left out
+  // nearly all of the money.
+  const spent =
+    (scenes ?? []).reduce((t, s: any) => t + Number(s.cost_usd || 0), 0) +
+    (shots ?? []).reduce((t, s: any) => t + Number(s.cost_usd || 0), 0);
   const written = (scenes ?? []).filter((s: any) => s.script).length;
   const allWritten = (scenes ?? []).length > 0 && written === (scenes ?? []).length;
 

@@ -1,5 +1,6 @@
 import * as fal from "@fal-ai/serverless-client";
 import { createServiceClient } from "@/lib/supabase/server";
+import { shotWebhookUrl } from "./webhook-token";
 import { styleFragment } from "@/lib/stages";
 import { clipEndpoint, CLIP_MODELS, type ClipModel } from "./models";
 
@@ -153,7 +154,7 @@ export async function generateClip(shotId: string, model: ClipModel, userId: str
         ...(spec.durationKind === "seedance" ? {} : { negative_prompt: liveAction ? NEGATIVE_LIVE : NEGATIVE_BASE }),
         ...extra,
       },
-      webhookUrl: `${process.env.APP_URL}/api/webhooks/fal-shot?shot=${shotId}&kind=clip`,
+      webhookUrl: shotWebhookUrl(shotId, "clip"),
     });
 
     await db

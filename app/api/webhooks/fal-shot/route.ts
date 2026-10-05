@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { putFromUrl } from "@/lib/storage/r2";
 import crypto from "crypto";
+import { shotWebhookToken } from "@/lib/production/webhook-token";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -18,16 +19,23 @@ function verify(raw: string, signature: string | null) {
 
 export async function POST(req: Request) {
   const raw = await req.text();
-  if (!verify(raw, req.headers.get("x-fal-signature"))) {
-    return NextResponse.json({ error: "Bad signature" }, { status: 401 });
-  }
-
   const url = new URL(req.url);
   const shotId = url.searchParams.get("shot");
   const kind = url.searchParams.get("kind");
 
   if (!shotId || (kind !== "keyframe" && kind !== "clip")) {
     return NextResponse.json({ error: "Missing shot or kind" }, { status: 400 });
+  }
+
+  // The per-shot token proves the call answers a job this app submitted.
+  // (The header check is kept for setups that configured it.)
+  const token = url.searchParams.get("t") ?? "";
+  const expected = shotWebhookToken(shotId, kind);
+  const tokenOk =
+    token.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  if (!tokenOk && !(process.env.FAL_WEBHOOK_SECRET && verify(raw, req.headers.get("x-fal-signature")))) {
+    return NextResponse.json({ error: "Bad token" }, { status: 401 });
   }
 
   const payload = JSON.parse(raw);
@@ -39,11 +47,19 @@ export async function POST(req: Request) {
 
   const { data: shot } = await db
     .from("shots")
-    .select("id, episode_id, n")
+    .select("id, episode_id, n, keyframe_job_id, clip_job_id")
     .eq("id", shotId)
     .maybeSingle();
 
   if (!shot) return NextResponse.json({ error: "Shot not found" }, { status: 404 });
+
+  // An answer to an older job: a redo was submitted since. Letting it in
+  // put the earlier picture back over the one just paid for.
+  const current = kind === "keyframe" ? shot.keyframe_job_id : shot.clip_job_id;
+  const answering = payload.request_id ?? payload.requestId;
+  if (current && answering && current !== answering) {
+    return NextResponse.json({ ok: true, ignored: "superseded" });
+  }
 
   if (payload.status === "ERROR" || payload.error) {
     await db

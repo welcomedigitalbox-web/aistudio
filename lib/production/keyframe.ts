@@ -1,5 +1,6 @@
 import * as fal from "@fal-ai/serverless-client";
 import { createServiceClient } from "@/lib/supabase/server";
+import { shotWebhookUrl } from "./webhook-token";
 import { styleFragment } from "@/lib/stages";
 import { KEYFRAME_MODELS, type KeyframeModel } from "./models";
 
@@ -191,6 +192,12 @@ export async function generateKeyframe(
       keyframe_state: "running",
       keyframe_model: endpoint,
       keyframe_error: null,
+      // A new still has to be looked at again, and a clip made from the old
+      // one no longer matches it.
+      keyframe_approved: false,
+      clip_storage_key: null,
+      clip_state: "idle",
+      last_frame_storage_key: null,
       created_by: shot.created_by ?? userId,
     })
     .eq("id", shotId);
@@ -253,7 +260,7 @@ export async function generateKeyframe(
   try {
     const { request_id } = await fal.queue.submit(endpoint, {
       input,
-      webhookUrl: `${process.env.APP_URL}/api/webhooks/fal-shot?shot=${shotId}&kind=keyframe`,
+      webhookUrl: shotWebhookUrl(shotId, "keyframe"),
     });
 
     await db

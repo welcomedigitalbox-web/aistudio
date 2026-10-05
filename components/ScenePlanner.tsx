@@ -50,7 +50,7 @@ export function ScenePlanner({
         <strong>{planned ? "Re-plan the scenes" : "Plan the scenes"}</strong>
         <div className="note" style={{ marginTop: 4 }}>
           Structure only — what each scene does and how it turns. No dialogue yet.
-          {planned && " Re-planning discards any scenes already written."}
+          {planned && " Re-planning discards every scene already written, and with them every shot, still, clip and recorded line."}
         </div>
       </div>
 

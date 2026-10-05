@@ -75,13 +75,13 @@ export async function POST(req: Request) {
         const { episodeId, stage, model } = body;
         const { data: shots } = await db
           .from("shots")
-          .select("id, target_seconds, keyframe_storage_key, keyframe_approved, clip_storage_key")
+          .select("id, target_seconds, keyframe_storage_key, keyframe_approved, clip_storage_key, keyframe_state, clip_state")
           .eq("episode_id", episodeId);
 
         const list = shots ?? [];
 
         if (stage === "keyframe") {
-          const pending = list.filter((s) => !s.keyframe_storage_key);
+          const pending = list.filter((s) => !s.keyframe_storage_key && s.keyframe_state !== "running");
           const usd = KEYFRAME_MODELS[model as keyof typeof KEYFRAME_MODELS]?.usd ?? 0;
           return NextResponse.json({
             count: pending.length,
@@ -89,7 +89,9 @@ export async function POST(req: Request) {
           });
         }
 
-        const pending = list.filter((s) => s.keyframe_approved && !s.clip_storage_key);
+        const pending = list.filter(
+          (s) => s.keyframe_approved && !s.clip_storage_key && s.clip_state !== "running"
+        );
 
         const total =
           model in OPENLUX_MODELS
