@@ -28,6 +28,31 @@ export async function POST(req: Request) {
         );
       }
 
+      case "upload-keyframe": {
+        // The creator's own picture as the still. Same reset as a new
+        // generation: an old clip was made from the old still.
+        const { shotId, storageKey } = body;
+        if (!shotId || typeof storageKey !== "string" || !storageKey.startsWith(`shots/uploads/${shotId}/`)) {
+          return NextResponse.json({ error: "shotId and the uploaded file are required." }, { status: 400 });
+        }
+        const { error } = await db
+          .from("shots")
+          .update({
+            keyframe_storage_key: storageKey,
+            keyframe_state: "ready",
+            keyframe_error: null,
+            keyframe_job_id: null,
+            keyframe_model: "upload",
+            keyframe_approved: false,
+            clip_storage_key: null,
+            clip_state: "idle",
+            last_frame_storage_key: null,
+          })
+          .eq("id", shotId);
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true });
+      }
+
       case "clip": {
         const { shotId, model } = body;
 

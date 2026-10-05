@@ -14,8 +14,11 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
-  const { refId, contentType } = await req.json();
-  if (!refId) return NextResponse.json({ error: "refId is required." }, { status: 400 });
+  // A reference image (refId) or a shot's own keyframe (shotId).
+  const { refId, shotId, contentType } = await req.json();
+  if (!refId && !shotId) {
+    return NextResponse.json({ error: "refId or shotId is required." }, { status: 400 });
+  }
 
   if (!/^image\/(png|jpeg|webp)$/.test(contentType ?? "")) {
     return NextResponse.json(
@@ -25,7 +28,9 @@ export async function POST(req: Request) {
   }
 
   const ext = contentType.split("/")[1].replace("jpeg", "jpg");
-  const key = `refs/uploads/${refId}/${crypto.randomUUID()}.${ext}`;
+  const key = shotId
+    ? `shots/uploads/${shotId}/${crypto.randomUUID()}.${ext}`
+    : `refs/uploads/${refId}/${crypto.randomUUID()}.${ext}`;
 
   const s3 = new S3Client({
     region: "auto",

@@ -103,6 +103,35 @@ export function Production({
   const spent = shots.reduce((t, s) => t + Number(s.cost_usd), 0);
   const runtime = shots.reduce((t, s) => t + Number(s.clip_seconds ?? 0), 0);
 
+  // The creator's own picture as the still: signed URL, straight to storage,
+  // then the shot points at it.
+  async function uploadStill(shotId: string, file: File) {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+      setError("Upload a PNG, JPEG or WebP image.");
+      return;
+    }
+    setBusy(shotId);
+    setError("");
+    try {
+      const signRes = await fetch("/api/refs/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shotId, contentType: file.type }),
+      });
+      const sign = await signRes.json();
+      if (!signRes.ok) throw new Error(sign.error ?? "Could not prepare the upload.");
+      const put = await fetch(sign.url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!put.ok) throw new Error(`Storage rejected the file (${put.status}).`);
+      setBusy(null);
+      const ok = await call({ action: "upload-keyframe", shotId, storageKey: sign.key }, shotId);
+      if (ok) router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function call(payload: Record<string, unknown>, key: string) {
     setBusy(key);
     setError("");
@@ -405,6 +434,32 @@ export function Production({
                         >
                           {busy === shot.id ? "…" : kfUrl ? "redo still" : "still"}
                         </button>
+
+                        <label
+                          className="ghost"
+                          title="Use your own picture as this shot's still"
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            border: "1px solid var(--line)",
+                            borderRadius: 4,
+                            cursor: busy !== null || running ? "not-allowed" : "pointer",
+                            opacity: busy !== null || running ? 0.5 : 1,
+                          }}
+                        >
+                          upload
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            disabled={busy !== null || running}
+                            style={{ display: "none" }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = "";
+                              if (f) uploadStill(shot.id, f);
+                            }}
+                          />
+                        </label>
 
                         <button
                           className="ghost"
