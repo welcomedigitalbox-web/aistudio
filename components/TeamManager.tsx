@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { OnlineDot } from "@/components/Online";
 
 interface Person {
   id: string;
@@ -173,7 +174,7 @@ export function TeamManager({
           <div key={p.id} className="card">
             <div className="row between">
               <div style={{ minWidth: 0 }}>
-                <h3 style={{ fontSize: 15 }}>{p.full_name ?? p.email}</h3>
+                <h3 style={{ fontSize: 15 }}>{p.full_name ?? p.email}<OnlineDot userId={p.id} /></h3>
                 <div className="note mono" style={{ fontSize: 12 }}>
                   {p.email}
                   {p.id === meId ? " · you" : ""}

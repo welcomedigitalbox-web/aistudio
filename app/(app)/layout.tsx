@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Presence } from "@/components/Presence";
 import { Bell } from "@/components/Bell";
 import { HelpAssistant } from "@/components/HelpAssistant";
+import { OnlineNow } from "@/components/Online";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {me?.role === "admin" && <Link href="/team">Team</Link>}
         </nav>
         <div className="spacer" />
+        <OnlineNow meId={user.id} />
         <Bell userId={user.id} />
         <span className="mono note" style={{ marginLeft: 12 }}>{user.email}</span>
       </header>
