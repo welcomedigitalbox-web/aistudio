@@ -131,8 +131,26 @@ export async function generateKeyframe(
       .order("n", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (prev?.keyframe_storage_key && refUrls.length < (spec.maxRefs ?? 4)) {
-      refUrls.push(`${base}/${prev.keyframe_storage_key}`);
+    // The first shot of a scene: carry on from the last approved still of an
+    // earlier scene in the same place (same heading), so the rail line or the
+    // office in scene 5 is the one from scene 4.
+    let carry = prev?.keyframe_storage_key ?? null;
+    if (!carry && shot.slug && shot.scene_n != null) {
+      const { data: earlier } = await db
+        .from("shots")
+        .select("keyframe_storage_key")
+        .eq("episode_id", shot.episode_id)
+        .eq("slug", shot.slug)
+        .lt("scene_n", shot.scene_n)
+        .eq("keyframe_approved", true)
+        .not("keyframe_storage_key", "is", null)
+        .order("n", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      carry = earlier?.keyframe_storage_key ?? null;
+    }
+    if (carry && refUrls.length < (spec.maxRefs ?? 4)) {
+      refUrls.push(`${base}/${carry}`);
       continuity = true;
     }
   }
@@ -146,7 +164,7 @@ export async function generateKeyframe(
             : `Reference image ${i + 1} is the location ${r.name}: match its architecture, materials and light`
         ),
         continuity
-          ? `Reference image ${withArt.length + 1} is the previous shot of this same scene: keep costumes, props, hats, damage and light consistent with it, but use the camera angle described here, not its framing`
+          ? `Reference image ${withArt.length + 1} is an earlier shot of this same place: keep the set, buildings, landscape, costumes, props, hats, damage and light consistent with it — add nothing that is not in it unless described here — but use the camera angle described here, not its framing`
           : "",
       ].filter(Boolean).join(". ")
     : "";
