@@ -63,10 +63,23 @@ export async function buildShots(sceneId: string, note?: string) {
 A shot is one continuous image with one motion. It becomes a still frame first
 and a short clip second, so write two prompts for each:
 
-VISUAL — the still. Composition, framing, what is in the frame, the light. This
-is an image prompt, so be concrete and physical. Name the characters and
-locations exactly as they appear in the reference list; those names resolve to
-reference art and must match character for character.
+VISUAL — the still. This is an image prompt, so be concrete and physical, and
+OPEN IT WITH THE CAMERA, in this order:
+  1. Framing, matching the "framing" field exactly (do not write "medium" in a
+     "wide" shot).
+  2. Where the camera stands and what it faces, relative to the set
+     ("camera in front of the desk, facing him").
+  3. Where each person is relative to the set pieces, and which way they face
+     ("he stands BEHIND the desk, facing camera; the desk is between him and
+     us; papers on the near edge of the desk are soft and out of focus").
+Then what is in the frame and the light. Follow the script's blocking from
+shot to shot: if he walked to the desk in the last shot, he is at the desk now.
+For a point-of-view shot set framing to "pov" and write what the character's
+own eyes see — their hands may show at the bottom of frame, their face never.
+Plain description only: no tags like [VISUAL], no sound or audio notes.
+Name the characters and locations exactly as they appear in the reference
+list; those names resolve to reference art and must match character for
+character.
 
 MOTION — what moves, over 5 to 10 seconds. Small and specific: a head turning,
 rain on glass, someone sitting down. Camera moves are allowed but sparingly.
@@ -88,7 +101,7 @@ Return JSON only, no fences:
 {
   "shots": [{
     "n": 1,
-    "framing": "wide | medium | close | insert | over-shoulder",
+    "framing": "wide | medium | close | insert | over-shoulder | pov",
     "visual": "",
     "motion": "",
     "refs": ["exact names from the reference list that appear in this shot"],

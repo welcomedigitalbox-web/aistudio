@@ -21,10 +21,14 @@ function clipPrompt(opts: {
   const camera = opts.liveAction
     ? "Cinematic film still in motion, anamorphic lens, natural motion blur, realistic skin texture and micro-expressions, physically accurate light, 24fps film look, subtle handheld camera"
     : "Cinematic camera, smooth motion, consistent lighting";
+  const raw = opts.visual.replace(/\[(VISUAL|MOTION|AUDIO|SHOT)\]\s*/gi, "");
+  const direction = /^\s*DIRECTION:\s*([^\n]*)/i.exec(raw)?.[1]?.trim();
+  const visual = raw.replace(/^\s*DIRECTION:[^\n]*\n+/i, "").trim();
   return [
+    direction ? `Composition: ${direction}` : "",
+    `Scene: ${visual}`,
     opts.style,
     opts.subjects,
-    `Scene: ${opts.visual}`,
     opts.framing ? `${opts.framing} shot` : "",
     opts.motion ? `Action: ${opts.motion}` : "Action: subtle natural movement, the frame stays alive",
     camera,

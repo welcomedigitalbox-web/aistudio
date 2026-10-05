@@ -71,6 +71,9 @@ export function Production({
   const [busy, setBusy] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
+  // A correction for one still: where the camera is, who stands where.
+  const [fixFor, setFixFor] = useState<string | null>(null);
+  const [fixText, setFixText] = useState("");
   const [error, setError] = useState("");
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -356,6 +359,30 @@ export function Production({
                         {shot.visual.length > 90 ? "…" : ""}
                       </div>
 
+                      {fixFor === shot.id && (
+                        <div style={{ display: "grid", gap: 4 }}>
+                          <textarea
+                            rows={3}
+                            value={fixText}
+                            onChange={(e) => setFixText(e.target.value)}
+                            placeholder="Camera position and who stands where, e.g. Camera in front of the desk facing him; he stands behind the desk; papers in front are blurred. ဘာမှားနေလဲ ရေးပါ။"
+                            style={{ fontSize: 12, fontFamily: "inherit" }}
+                          />
+                          <button
+                            onClick={() =>
+                              call(
+                                { action: "keyframe", shotId: shot.id, model: kfModel, note: fixText },
+                                shot.id
+                              ).then(() => { setFixFor(null); router.refresh(); })
+                            }
+                            disabled={busy !== null || running || !fixText.trim()}
+                            style={{ fontSize: 11, padding: "3px 8px", justifySelf: "start" }}
+                          >
+                            Redo still with this
+                          </button>
+                        </div>
+                      )}
+
                       {shot.clip_state === "failed" && (
                         <div className="err" style={{ fontSize: 11 }}>{shot.clip_error}</div>
                       )}
@@ -373,6 +400,19 @@ export function Production({
                           style={{ fontSize: 11, padding: "2px 8px" }}
                         >
                           {busy === shot.id ? "…" : kfUrl ? "redo still" : "still"}
+                        </button>
+
+                        <button
+                          className="ghost"
+                          onClick={() => {
+                            setFixFor(fixFor === shot.id ? null : shot.id);
+                            setFixText(/^\s*DIRECTION:\s*([^\n]*)/i.exec(shot.visual)?.[1] ?? "");
+                          }}
+                          disabled={busy !== null || running}
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                          title="Say what is wrong with the still and redo it"
+                        >
+                          fix
                         </button>
 
                         {kfUrl && (

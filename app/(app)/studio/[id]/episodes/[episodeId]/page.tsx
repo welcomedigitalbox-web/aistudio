@@ -100,12 +100,17 @@ export default async function EpisodePage({
 
       {/* 2 — write */}
       <h2 style={{ marginTop: 36, marginBottom: 12 }}>2 · Script</h2>
-      {!reached("write_scenes") ? (
+      {/* Written work stays on screen when an earlier step is reopened —
+          read-only until that step is approved again. */}
+      {!reached("write_scenes") && written === 0 ? (
         <Locked what="Writing" blockedBy="approving the scene plan" />
       ) : (
         <>
-          <SceneList scenes={(scenes ?? []) as any} locked={episode.script_approved} />
-          {allWritten && (
+          <SceneList
+            scenes={(scenes ?? []) as any}
+            locked={episode.script_approved || !reached("write_scenes")}
+          />
+          {allWritten && reached("write_scenes") && (
             <div style={{ marginTop: 12 }}>
               <Gate
                 episodeId={episode.id}
@@ -121,16 +126,16 @@ export default async function EpisodePage({
 
       {/* 3 — shots */}
       <h2 style={{ marginTop: 36, marginBottom: 12 }}>3 · Shots</h2>
-      {!reached("build_shots") ? (
+      {!reached("build_shots") && (shots ?? []).length === 0 ? (
         <Locked what="Shot list" blockedBy="approving the script" />
       ) : (
         <>
           <ShotList
             scenes={(scenes ?? []) as any}
             shots={(shots ?? []) as any}
-            locked={episode.shots_approved}
+            locked={episode.shots_approved || !reached("build_shots")}
           />
-          {(shots ?? []).length > 0 && (
+          {(shots ?? []).length > 0 && reached("build_shots") && (
             <div style={{ marginTop: 12 }}>
               <Gate
                 episodeId={episode.id}

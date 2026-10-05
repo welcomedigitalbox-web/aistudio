@@ -17,10 +17,30 @@ fal.config({ credentials: process.env.FAL_KEY! });
  * produced the reference sheet. Rewording them pulls the model away from the
  * image it was given.
  */
+/** Tags and audio notes the shot writer sometimes leaves in a visual prompt. */
+function cleanVisual(v: string) {
+  return v
+    .replace(/^\s*DIRECTION:[^\n]*\n+/i, "")
+    .replace(/\[(VISUAL|MOTION|AUDIO|SHOT)\]\s*/gi, "")
+    .replace(/,?\s*(mute|no|silent) audio\b[^,.]*/gi, "")
+    .trim();
+}
+
+const FRAMING: Record<string, string> = {
+  wide: "Wide shot",
+  medium: "Medium shot",
+  close: "Close-up",
+  "close-up": "Close-up",
+  insert: "Insert close-up of the object",
+  "over-shoulder": "Over-the-shoulder shot",
+  pov: "First-person POV shot: we see exactly what the character sees, their hands may show at the bottom of frame, their face never appears",
+};
+
 export async function generateKeyframe(
   shotId: string,
   model: KeyframeModel,
-  userId: string
+  userId: string,
+  note?: string
 ) {
   const db = createServiceClient();
   const spec = KEYFRAME_MODELS[model];
@@ -28,6 +48,19 @@ export async function generateKeyframe(
   const { data: shot } = await db.from("shots").select("*").eq("id", shotId).single();
   if (!shot) throw new Error("Shot not found.");
   if (!shot.visual) throw new Error("This shot has no visual prompt.");
+
+  /**
+   * A correction from the person reviewing the still ("he is BEHIND the desk,
+   * camera in front of it"). It is kept on the shot as its first line, so the
+   * next redo and the clip both follow it, and it replaces any earlier one.
+   */
+  const direction = (note ?? "").trim();
+  if (direction) {
+    const visual = `DIRECTION: ${direction}\n\n${cleanVisual(shot.visual)}`;
+    await db.from("shots").update({ visual }).eq("id", shotId);
+    shot.visual = visual;
+  }
+  const storedDirection = /^\s*DIRECTION:\s*([^\n]*)/i.exec(shot.visual)?.[1]?.trim() ?? "";
 
   const { data: episode } = await db
     .from("episodes").select("series_id").eq("id", shot.episode_id).single();
@@ -63,11 +96,20 @@ export async function generateKeyframe(
 
   const subjects = ordered.map((r) => `${r.name}: ${r.description ?? ""}`).join(". ");
 
+  /**
+   * Camera first. Image models weight the start of a prompt most, and the cast
+   * descriptions are long: put them first and the model draws the people
+   * well and puts the camera wherever it likes.
+   */
+  const visual = cleanVisual(shot.visual);
+  const framingWord = String(shot.framing ?? "").toLowerCase();
+  const statesFraming = /\b(wide|medium|close|insert|over[- ]the[- ]shoulder|pov|point of view|establishing)\b/i.test(visual);
   const prompt = [
+    storedDirection ? `MOST IMPORTANT — the composition must be: ${storedDirection}` : "",
+    !statesFraming && FRAMING[framingWord] ? FRAMING[framingWord] : "",
+    visual,
     styleFragment(series.render_style),
-    subjects,
-    shot.visual,
-    shot.framing ? `${shot.framing} shot` : "",
+    subjects ? `Who is who (appearance only): ${subjects}` : "",
     series.render_style === "live_action"
       ? "shot on ARRI Alexa, 35mm anamorphic lens, motivated practical lighting, realistic skin pores and texture, film colour grade"
       : "",
@@ -75,7 +117,7 @@ export async function generateKeyframe(
   ]
     .map((s) => String(s ?? "").trim())
     .filter(Boolean)
-    .join(", ");
+    .join(". ");
 
   /**
    * A reference model on a shot with no reference art (an empty landscape, a

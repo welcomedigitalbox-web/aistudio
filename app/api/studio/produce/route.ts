@@ -19,11 +19,13 @@ export async function POST(req: Request) {
   try {
     switch (body.action) {
       case "keyframe": {
-        const { shotId, model } = body;
+        const { shotId, model, note } = body;
         if (!shotId || !(model in KEYFRAME_MODELS)) {
           return NextResponse.json({ error: "shotId and a valid model are required." }, { status: 400 });
         }
-        return NextResponse.json(await generateKeyframe(shotId, model, user.id));
+        return NextResponse.json(
+          await generateKeyframe(shotId, model, user.id, typeof note === "string" ? note.slice(0, 600) : undefined)
+        );
       }
 
       case "clip": {
