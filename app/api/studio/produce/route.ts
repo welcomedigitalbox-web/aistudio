@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { generateKeyframe } from "@/lib/production/keyframe";
+import { generateKeyframe, editKeyframe } from "@/lib/production/keyframe";
 import { generateClip, chainScene } from "@/lib/production/clip";
 import { KEYFRAME_MODELS, CLIP_MODELS, clipEndpoint } from "@/lib/production/models";
 import { OPENLUX_MODELS } from "@/lib/production/openlux";
@@ -19,9 +19,15 @@ export async function POST(req: Request) {
   try {
     switch (body.action) {
       case "keyframe": {
-        const { shotId, model, note } = body;
+        const { shotId, model, note, keepRest } = body;
         if (!shotId || !(model in KEYFRAME_MODELS)) {
           return NextResponse.json({ error: "shotId and a valid model are required." }, { status: 400 });
+        }
+        // Change one thing on the current still and keep the rest.
+        if (keepRest) {
+          return NextResponse.json(
+            await editKeyframe(shotId, model, user.id, String(note ?? "").slice(0, 600))
+          );
         }
         return NextResponse.json(
           await generateKeyframe(shotId, model, user.id, typeof note === "string" ? note.slice(0, 600) : undefined)

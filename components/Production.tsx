@@ -74,6 +74,8 @@ export function Production({
   // A correction for one still: where the camera is, who stands where.
   const [fixFor, setFixFor] = useState<string | null>(null);
   const [fixText, setFixText] = useState("");
+  // Change only what is written and keep the rest of the current still.
+  const [keepRest, setKeepRest] = useState(true);
   const [error, setError] = useState("");
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -401,17 +403,33 @@ export function Production({
                             placeholder="Camera position and who stands where, e.g. Camera in front of the desk facing him; he stands behind the desk; papers in front are blurred. ဘာမှားနေလဲ ရေးပါ။"
                             style={{ fontSize: 12, fontFamily: "inherit" }}
                           />
+                          {kfUrl && (
+                            <label className="note" style={{ fontSize: 11, display: "flex", gap: 6, alignItems: "center" }}>
+                              <input
+                                type="checkbox"
+                                checked={keepRest}
+                                onChange={(e) => setKeepRest(e.target.checked)}
+                              />
+                              Keep this picture, change only what I wrote
+                            </label>
+                          )}
                           <button
                             onClick={() =>
                               call(
-                                { action: "keyframe", shotId: shot.id, model: kfModel, note: fixText },
+                                {
+                                  action: "keyframe",
+                                  shotId: shot.id,
+                                  model: kfModel,
+                                  note: fixText,
+                                  keepRest: Boolean(kfUrl) && keepRest,
+                                },
                                 shot.id
                               ).then(() => { setFixFor(null); router.refresh(); })
                             }
                             disabled={busy !== null || running || !fixText.trim()}
                             style={{ fontSize: 11, padding: "3px 8px", justifySelf: "start" }}
                           >
-                            Redo still with this
+                            {kfUrl && keepRest ? "Change this still" : "Redo still with this"}
                           </button>
                         </div>
                       )}
@@ -465,7 +483,7 @@ export function Production({
                           className="ghost"
                           onClick={() => {
                             setFixFor(fixFor === shot.id ? null : shot.id);
-                            setFixText(/^\s*DIRECTION:\s*([^\n]*)/i.exec(shot.visual)?.[1] ?? "");
+                            setFixText(keepRest && kfUrl ? "" : /^\s*DIRECTION:\s*([^\n]*)/i.exec(shot.visual)?.[1] ?? "");
                           }}
                           disabled={busy !== null || running}
                           style={{ fontSize: 11, padding: "2px 8px" }}

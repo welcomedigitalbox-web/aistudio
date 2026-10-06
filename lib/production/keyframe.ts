@@ -303,3 +303,113 @@ export async function generateKeyframe(
     throw e;
   }
 }
+
+/**
+ * Change one thing on the still the shot already has, and keep the rest.
+ *
+ * A redo starts again from words, so a picture the creator liked comes back
+ * as a different picture ("add his jacket" and the camera, the chair and the
+ * light all move). Here the current still is reference image 1 and the model
+ * is told to edit it, not to compose a new shot. The change is not stored on
+ * the shot: it is a one-off touch-up, not part of the shot's description.
+ */
+export async function editKeyframe(
+  shotId: string,
+  model: KeyframeModel,
+  userId: string,
+  change: string
+) {
+  const db = createServiceClient();
+  const spec = KEYFRAME_MODELS[model];
+  if (!spec.refs) throw new Error("Pick a model that edits images (Nano Banana) to change a still.");
+  const what = change.trim();
+  if (!what) throw new Error("Say what to change.");
+
+  const { data: shot } = await db.from("shots").select("*").eq("id", shotId).single();
+  if (!shot) throw new Error("Shot not found.");
+  if (!shot.keyframe_storage_key) throw new Error("This shot has no still to change yet.");
+
+  const { data: episode } = await db
+    .from("episodes").select("series_id").eq("id", shot.episode_id).single();
+  if (!episode) throw new Error("Episode not found.");
+  const { data: series } = await db
+    .from("series").select("aspect_ratio").eq("id", episode.series_id).single();
+
+  // The cast in the shot, so a costume or face asked for comes from their art.
+  const { data: allRefs } = await db
+    .from("refs")
+    .select("id, kind, name, chosen_image_id")
+    .eq("series_id", episode.series_id)
+    .eq("kind", "character");
+  const text = `${cleanVisual(shot.visual ?? "")} ${what}`.toLowerCase();
+  const cast = (allRefs ?? []).filter((r) => {
+    const base = r.name.toLowerCase().split(" (")[0].trim();
+    return r.chosen_image_id && ((shot.ref_ids ?? []).includes(r.id) || (base.length > 3 && text.includes(base)));
+  });
+  const { data: images } = cast.length
+    ? await db.from("ref_images").select("id, storage_key").in("id", cast.map((r) => r.chosen_image_id!))
+    : { data: [] };
+  const byId = new Map((images ?? []).map((i) => [i.id, i.storage_key]));
+  const base = process.env.R2_PUBLIC_BASE_URL ?? "";
+
+  const urls = [`${base}/${shot.keyframe_storage_key}`];
+  const guide: string[] = [];
+  for (const r of cast) {
+    const key = byId.get(r.chosen_image_id!);
+    if (!key || urls.length >= (spec.maxRefs ?? 4)) continue;
+    urls.push(`${base}/${key}`);
+    guide.push(`Reference image ${urls.length} shows ${r.name}: use it only for his face and costume`);
+  }
+
+  const prompt = [
+    "Edit reference image 1. Keep it exactly as it is: the same camera position, framing and crop, the same people in the same poses, the same furniture, props, walls, light, colours and film grain",
+    `Change only this: ${what}`,
+    ...guide,
+    "Nothing else changes. no text, no watermark",
+  ].join(". ");
+
+  const portrait = series?.aspect_ratio === "9:16";
+  const input: Record<string, unknown> = {
+    prompt,
+    num_images: 1,
+    image_urls: urls,
+  };
+  if (spec.id.includes("nano-banana")) {
+    input.aspect_ratio = portrait ? "9:16" : "16:9";
+    if (spec.id.includes("pro")) input.resolution = "2K";
+  } else if (spec.id.includes("seedream")) {
+    input.image_size = portrait ? { width: 1440, height: 2560 } : { width: 2560, height: 1440 };
+  }
+
+  await db
+    .from("shots")
+    .update({
+      keyframe_state: "running",
+      keyframe_model: spec.id,
+      keyframe_error: null,
+      keyframe_approved: false,
+      clip_storage_key: null,
+      clip_state: "idle",
+      last_frame_storage_key: null,
+      created_by: shot.created_by ?? userId,
+    })
+    .eq("id", shotId);
+
+  try {
+    const { request_id } = await fal.queue.submit(spec.id, {
+      input,
+      webhookUrl: shotWebhookUrl(shotId, "keyframe"),
+    });
+    await db
+      .from("shots")
+      .update({ keyframe_job_id: request_id, cost_usd: Number(shot.cost_usd) + spec.usd })
+      .eq("id", shotId);
+    return { shotId, estimatedCostUsd: spec.usd, usedRefs: urls.length, warning: null };
+  } catch (e) {
+    await db
+      .from("shots")
+      .update({ keyframe_state: "failed", keyframe_error: (e as Error).message })
+      .eq("id", shotId);
+    throw e;
+  }
+}
