@@ -17,6 +17,8 @@ interface Shot {
   keyframe_state: string;
   keyframe_error: string | null;
   keyframe_approved: boolean;
+  keyframe_model?: string | null;
+  keyframe_history?: string[] | null;
   clip_storage_key: string | null;
   clip_state: string;
   clip_model: string | null;
@@ -132,6 +134,15 @@ export function Production({
     } finally {
       setBusy(null);
     }
+  }
+
+  // An uploaded picture is the creator's own work: ask before a model
+  // replaces it. It is kept either way, and "back" brings it back.
+  function guardUpload(shot: Shot) {
+    if (shot.keyframe_model !== "upload") return true;
+    return window.confirm(
+      "This still is a picture you uploaded. Make a new one from it? The upload is kept: press \"back\" to return to it."
+    );
   }
 
   async function call(payload: Record<string, unknown>, key: string) {
@@ -415,6 +426,7 @@ export function Production({
                           )}
                           <button
                             onClick={() =>
+                              guardUpload(shot) &&
                               call(
                                 {
                                   action: "keyframe",
@@ -442,6 +454,7 @@ export function Production({
                         <button
                           className="ghost"
                           onClick={() =>
+                            guardUpload(shot) &&
                             call(
                               { action: "keyframe", shotId: shot.id, model: kfModel },
                               shot.id
@@ -452,6 +465,23 @@ export function Production({
                         >
                           {busy === shot.id ? "…" : kfUrl ? "redo still" : "still"}
                         </button>
+
+                        {(shot.keyframe_history?.length ?? 0) > 0 && (
+                          <button
+                            className="ghost"
+                            title={`Go back to the previous still (${shot.keyframe_history!.length} kept)`}
+                            onClick={() =>
+                              call(
+                                { action: "restore-keyframe", shotId: shot.id, key: shot.keyframe_history![0] },
+                                shot.id
+                              ).then(() => router.refresh())
+                            }
+                            disabled={busy !== null || running}
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                          >
+                            ◀ back
+                          </button>
+                        )}
 
                         <label
                           className="ghost"

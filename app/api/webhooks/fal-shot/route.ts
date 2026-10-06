@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rememberKeyframe } from "@/lib/production/history";
 import { createServiceClient } from "@/lib/supabase/server";
 import { putFromUrl } from "@/lib/storage/r2";
 import crypto from "crypto";
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
 
   const { data: shot } = await db
     .from("shots")
-    .select("id, episode_id, n, keyframe_job_id, clip_job_id")
+    .select("id, episode_id, n, keyframe_job_id, clip_job_id, keyframe_storage_key")
     .eq("id", shotId)
     .maybeSingle();
 
@@ -107,6 +108,7 @@ export async function POST(req: Request) {
       patch.last_frame_storage_key = tailKey;
     }
 
+    if (kind === "keyframe") await rememberKeyframe(db, shotId, shot.keyframe_storage_key);
     await db.from("shots").update(patch).eq("id", shotId);
   } catch (e) {
     await db

@@ -5,6 +5,7 @@ import { generateClip, chainScene } from "@/lib/production/clip";
 import { KEYFRAME_MODELS, CLIP_MODELS, clipEndpoint } from "@/lib/production/models";
 import { OPENLUX_MODELS } from "@/lib/production/openlux";
 import { inngest } from "@/lib/inngest/client";
+import { rememberKeyframe } from "@/lib/production/history";
 
 export const maxDuration = 300;
 
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
         if (!shotId || typeof storageKey !== "string" || !storageKey.startsWith(`shots/uploads/${shotId}/`)) {
           return NextResponse.json({ error: "shotId and the uploaded file are required." }, { status: 400 });
         }
+        const { data: before } = await db.from("shots").select("keyframe_storage_key").eq("id", shotId).single();
+        await rememberKeyframe(db, shotId, before?.keyframe_storage_key);
         const { error } = await db
           .from("shots")
           .update({
@@ -49,6 +52,35 @@ export async function POST(req: Request) {
             keyframe_error: null,
             keyframe_job_id: null,
             keyframe_model: "upload",
+            keyframe_approved: false,
+            clip_storage_key: null,
+            clip_state: "idle",
+            last_frame_storage_key: null,
+          })
+          .eq("id", shotId);
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "restore-keyframe": {
+        // Put an earlier still back. The one on screen goes onto the list.
+        const { shotId, key } = body;
+        const { data: s, error: e1 } = await db
+          .from("shots").select("keyframe_storage_key, keyframe_history").eq("id", shotId).single();
+        if (e1 || !s) throw new Error(e1?.message ?? "Shot not found.");
+        const history: string[] = s.keyframe_history ?? [];
+        if (!history.includes(key)) {
+          return NextResponse.json({ error: "That picture is not in this shot's history." }, { status: 400 });
+        }
+        const rest = history.filter((k) => k !== key && k !== s.keyframe_storage_key);
+        const { error } = await db
+          .from("shots")
+          .update({
+            keyframe_storage_key: key,
+            keyframe_history: (s.keyframe_storage_key ? [s.keyframe_storage_key, ...rest] : rest).slice(0, 12),
+            keyframe_state: "ready",
+            keyframe_error: null,
+            keyframe_job_id: null,
             keyframe_approved: false,
             clip_storage_key: null,
             clip_state: "idle",
